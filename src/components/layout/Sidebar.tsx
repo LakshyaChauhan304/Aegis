@@ -1,6 +1,13 @@
 import React from "react";
 import { ROUTE_GROUPS } from "./routes.ts";
 
+const PILLAR_COLORS: Record<string, string> = {
+  Control: "var(--info)",
+  Record: "var(--allow)",
+  Investigate: "var(--amber)",
+  System: "var(--dim)",
+};
+
 export default function Sidebar({ route, setRoute }: any) {
   return (
     <nav className="sidebar">
@@ -13,7 +20,25 @@ export default function Sidebar({ route, setRoute }: any) {
       <div className="navscroll">
         {ROUTE_GROUPS.map((g: any) => (
           <div className="navgroup" key={g.group}>
-            <h4>{g.group.toUpperCase()}</h4>
+            <h4 style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{
+                display: "inline-block",
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: PILLAR_COLORS[g.group] || "var(--dim)",
+                flexShrink: 0,
+              }}></span>
+              {g.group.toUpperCase()}
+              <span className="mono" style={{
+                fontSize: 9,
+                color: "var(--dim)",
+                marginLeft: "auto",
+                background: "var(--panel-3)",
+                padding: "1px 5px",
+                borderRadius: 2,
+              }}>{g.items.length}</span>
+            </h4>
             {g.items.map((i: any) => (
               <button
                 key={i.id}

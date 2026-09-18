@@ -94,6 +94,29 @@ export default function Investigations({ events, analysis, analysisSource, setAn
         </div>
 
         <div>
+          <Panel flush style={{ marginBottom: "var(--s5)", border: "1px solid var(--info)", background: "linear-gradient(180deg, rgba(94,143,201,0.08) 0%, transparent 100%)" }}>
+            <div style={{ padding: "var(--s4)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--s3)", marginBottom: "var(--s4)" }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--info-bg)", border: "1.5px solid var(--info)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>&#128737;</div>
+                <div>
+                  <div className="mono" style={{ fontSize: 11, letterSpacing: "0.1em", color: "var(--info)" }}>NEGATIVE ASSERTIONS SHIELD</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>ZERO RUNTIME GATING AUTHORITY</div>
+                </div>
+              </div>
+              <div>
+                {analysis.notAsserted.map((n: any, i: any) => (
+                  <div key={i} style={{ display: "flex", gap: "var(--s3)", marginBottom: i === analysis.notAsserted.length - 1 ? 0 : "12px", alignItems: "flex-start", lineHeight: 1.5 }}>
+                    <span style={{ color: "var(--deny)", flexShrink: 0, marginTop: 2 }} aria-hidden="true">&#10005;</span>
+                    <span style={{ color: "var(--fg)", fontSize: 13 }}>{n}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ padding: "10px 16px", borderTop: "1px solid var(--info)", background: "rgba(94,143,201,0.06)", fontSize: 11, color: "var(--muted)" }}>
+              Bedrock is a post-hoc forensic synthesis tool. It holds zero runtime authorization capability.
+            </div>
+          </Panel>
+
           <Panel title="EVIDENCE REFERENCES">
             {analysis.refs.map((r: any, i: any) => (
               <div key={i} className="mono" style={{ fontSize: 11.5, padding: "5px 0", borderBottom: "1px solid var(--line)" }}>
@@ -102,17 +125,6 @@ export default function Investigations({ events, analysis, analysisSource, setAn
             ))}
             <div style={{ marginTop: 12 }}>
               <button className="btn sm" onClick={() => go("evidence")}>Open evidence ledger</button>
-            </div>
-          </Panel>
-
-          <Panel title="WHAT BEDROCK DOES NOT ASSERT">
-            <div className="dim">
-              {analysis.notAsserted.map((n: any, i: any) => (
-                <div key={i} style={{ display: "flex", gap: "var(--s3)", marginBottom: i === analysis.notAsserted.length - 1 ? 0 : "10px" }}>
-                  <span aria-hidden="true">&#10005;</span>
-                  {n}
-                </div>
-              ))}
             </div>
           </Panel>
         </div>

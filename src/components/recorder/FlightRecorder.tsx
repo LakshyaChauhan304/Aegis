@@ -105,7 +105,20 @@ export default function FlightRecorder({ events, idx, setIdx, select, go, source
                       className={"clickable" + (isCurrent ? " sel" : "")}
                       style={{ opacity: isCurrent ? 1 : isPast ? 0.8 : 0.4 }}
                       onClick={() => setIdx(i)}>
-                      <td className="m dim">{String(i + 1).padStart(2, "0")}</td>
+                      <td className="m dim" style={{ position: "relative", paddingLeft: 24 }}>
+                        <div style={{
+                          position: "absolute",
+                          left: 8,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          width: e.decision === "DENY" ? 10 : 8,
+                          height: e.decision === "DENY" ? 10 : 8,
+                          borderRadius: e.decision === "DENY" ? "2px" : "50%",
+                          background: e.decision === "DENY" ? "var(--deny)" : e.trust === "UNTRUSTED_EXTERNAL" ? "var(--amber)" : "var(--allow)",
+                          boxShadow: isCurrent ? `0 0 8px ${e.decision === "DENY" ? "var(--deny)" : e.trust === "UNTRUSTED_EXTERNAL" ? "var(--amber)" : "var(--allow)"}` : "none",
+                        }}></div>
+                        {String(i + 1).padStart(2, "0")}
+                      </td>
                       <td className="m">{e.id}</td>
                       <td className="m">{e.action}</td>
                       <td className="m">{e.resource}</td>

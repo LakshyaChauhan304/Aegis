@@ -69,12 +69,27 @@ export default function Evidence({ events, selected, select, go, source, chain }
               </tr>
             </thead>
             <tbody>
-              {events.map((e: any) => (
+              {events.map((e: any, idx: number) => {
+                const prevEvent = idx > 0 ? events[idx - 1] : null;
+                const chainLinked = prevEvent ? e.prev === prevEvent.curr : true;
+                return (
                 <tr
                   key={e.id}
                   className={"clickable" + (e.id === ev.id ? " sel" : "")}
                   onClick={() => select(e.id)}>
-                  <td className="m dim">{String(e.seq).padStart(3, "0")}</td>
+                  <td className="m dim" style={{ position: "relative", paddingLeft: 20 }}>
+                    <div style={{
+                      position: "absolute",
+                      left: 4,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: e.decision === "DENY" ? 8 : 6,
+                      height: e.decision === "DENY" ? 8 : 6,
+                      borderRadius: e.decision === "DENY" ? "1px" : "50%",
+                      background: e.decision === "DENY" ? "var(--deny)" : e.trust === "UNTRUSTED_EXTERNAL" ? "var(--amber)" : "var(--allow)",
+                    }}></div>
+                    {String(e.seq).padStart(3, "0")}
+                  </td>
                   <td className="m">{e.id}</td>
                   <td className="m dim">{e.t.toFixed(3)}</td>
                   <td className="m">{e.action}</td>
@@ -85,11 +100,17 @@ export default function Evidence({ events, selected, select, go, source, chain }
                       : <span className="dim">{e.trust.toLowerCase()}</span>}
                   </td>
                   <td><DecisionChip d={e.decision} /></td>
-                  <td className="m dim">{e.prev ? short(e.prev) : "genesis"}</td>
-                  <td className="m">{short(e.curr)}</td>
-                  <td className="m" style={{ color: "var(--allow)" }}>&#10003;</td>
+                  <td className="m dim" style={{ fontFamily: "var(--mono)", fontSize: 10 }}>
+                    {e.prev ? short(e.prev) : "genesis"}
+                  </td>
+                  <td className="m" style={{ fontFamily: "var(--mono)", fontSize: 10 }}>
+                    {short(e.curr)}
+                  </td>
+                  <td className="m" style={{ color: chainLinked ? "var(--allow)" : "var(--deny)" }}>
+                    {chainLinked ? "✓" : "✗"}
+                  </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

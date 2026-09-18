@@ -2,7 +2,7 @@ import { EVENTS, INVESTIGATION } from "./fixtures.js";
 
 export const API_BASE = "";
 
-export const TIMEOUT_MS = 2500;
+export const TIMEOUT_MS = 15000;
 
 export const ENDPOINTS = {
   invoke: () => `${API_BASE}/api/agent/invoke`,
@@ -202,23 +202,20 @@ export const aegisApi = {
     });
     const payload = r.data || {};
     const decision = payload.decision;
-    const resultText = typeof payload.result === "string" ? payload.result : null;
     const byteCount =
       typeof payload.bytesReturned === "number"
         ? payload.bytesReturned
-        : resultText != null
-          ? new TextEncoder().encode(resultText).length
-          : typeof payload.error === "string"
-            ? 0
-            : null;
+        : decision?.decision === "DENY"
+          ? 0
+          : null;
     const executionState =
       payload.executionState ||
-      (decision?.decision === "DENY" ? "NOT_EXECUTED" : resultText != null ? "EXECUTED" : UNKNOWN);
+      (decision?.decision === "DENY" ? "NOT_EXECUTED" : UNKNOWN);
     return {
       source: "LOCAL",
       status: r.status || (r.ok ? 200 : 500),
       ok: r.ok,
-      result: resultText,
+      result: payload.result,
       error: payload.error || r.error,
       decision,
       eventId: decision?.eventId || payload.eventId || null,

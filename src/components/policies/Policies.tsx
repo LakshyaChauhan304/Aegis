@@ -54,7 +54,23 @@ export default function Policies({ go }: any) {
         </Panel>
         <div style={{ gridColumn: "2 / -1" }}>
           <Panel title={"CEDAR SOURCE \u00b7 " + p.file} flush>
-            <pre className="cedar">{p.sourceText}</pre>
+            <div style={{ position: "relative" }}>
+              <div style={{ position: "absolute", top: 12, right: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--deny-bg)", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--deny)" }}>
+                  <div style={{ width: 6, height: 6, background: "var(--deny)", borderRadius: "50%" }}></div>
+                  <span className="mono" style={{ fontSize: 10, color: "var(--deny)", letterSpacing: "0.05em", fontWeight: 600 }}>policy_1: ACTIVE DENY (.env)</span>
+                </div>
+              </div>
+              <pre className="cedar" style={{ margin: 0, padding: "var(--s5)", overflowX: "auto" }} dangerouslySetInnerHTML={{ 
+                __html: (p.sourceText || "")
+                  .replace(/permit|forbid|when|unless/g, '<span style="color: var(--info); font-weight: 600">$&</span>')
+                  .replace(/principal|action|resource|context/g, '<span style="color: var(--allow); font-weight: 600">$&</span>')
+                  .replace(/==|in|!/g, '<span style="color: var(--dim); font-weight: 600">$&</span>')
+                  .replace(/policy[0-9_a-zA-Z]+/g, '<span style="color: var(--amber); font-weight: 600">$&</span>')
+                  .replace(/"[^"]*"/g, '<span style="color: #a8cf82">$&</span>')
+                  .replace(/\/\/.*/g, '<span style="color: var(--muted)">$&</span>') 
+              }} />
+            </div>
             <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
               <Note kind="info">
                 This view displays the current Cedar policy loaded by the backend. It does not use

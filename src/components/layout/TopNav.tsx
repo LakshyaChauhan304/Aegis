@@ -1,19 +1,31 @@
 import React from "react";
 import { SESSION, CONTRACT } from "../../data/fixtures.js";
 
-export default function TopNav() {
+export default function TopNav({ chain }: any) {
+  const verified = chain && chain.verified !== false;
+
   return (
     <div className="authbar">
       <div className="authcell">
-        <div className="k">REFERENCE SESSION</div>
-        <div className="v">{SESSION.id}</div>
+        <div className="k">SHA-256 CHAIN</div>
+        <div className="v" style={{ color: verified ? "var(--allow)" : "var(--muted)" }}>
+          {verified ? "VERIFIED" : "UNVERIFIED"}
+        </div>
       </div>
       <div className="authcell">
-        <div className="k">REFERENCE AGENT</div>
+        <div className="k">CEDAR WASM</div>
+        <div className="v" style={{ color: "var(--info)" }}>ACTIVE</div>
+      </div>
+      <div className="authcell">
+        <div className="k">AGENT</div>
         <div className="v sans">{SESSION.agentName}</div>
       </div>
       <div className="authcell">
-        <div className="k">DEMO CONTRACT</div>
+        <div className="k">SESSION</div>
+        <div className="v">{SESSION.id}</div>
+      </div>
+      <div className="authcell">
+        <div className="k">CONTRACT</div>
         <div className="v">{CONTRACT.id}</div>
       </div>
       <div className="authcell">

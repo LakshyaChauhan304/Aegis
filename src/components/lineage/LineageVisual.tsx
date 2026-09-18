@@ -83,6 +83,8 @@ export default function LineageVisual({ go, selected, select, source, events = [
               let stroke = isProv ? "var(--amber)" : isTemp ? "var(--line-3)" : "var(--line-2)";
               if (isProv) stroke = "rgba(196, 146, 47, 0.6)";
 
+              let edgeLabel = kind === "hash" ? "Chained To" : isProv ? "Provenance Context" : isTemp ? "Authorized By" : "Targets Resource";
+
               return (
                 <g key={i}>
                   <path
@@ -91,15 +93,20 @@ export default function LineageVisual({ go, selected, select, source, events = [
                     style={{ stroke }}
                     markerEnd={isProv ? "url(#arrow-prov)" : "url(#arrow)"}
                   />
-                  {isProv && <text x={mx} y={y1 - 6} className="lbl" textAnchor="middle" fill="var(--amber)">provides context</text>}
-                  {isTemp && <text x={mx} y={y1 - 6} className="lbl" textAnchor="middle">precedes</text>}
-                  {kind === "hash" && <text x={mx} y={y1 - 6} className="lbl" textAnchor="middle">hash-chain link</text>}
+                  <rect x={mx - 50} y={y1 - 12} width={100} height={16} fill="var(--panel)" rx={2} />
+                  <text x={mx} y={y1 - 1} className="lbl mono" style={{ fontSize: 9 }} textAnchor="middle" fill={isProv ? "var(--amber)" : "var(--dim)"}>{edgeLabel}</text>
                 </g>
               );
             })}
             
             {nodes.map((n: any) => {
               const isSel = n.ev === selected && selected != null;
+              const isAgent = n.s?.includes("AGENT");
+              const isContract = n.id === "contract";
+              const isPolicy = n.id === "pol";
+              const isDeny = n.kind === "deny";
+              const isWarn = n.kind === "warn";
+              
               return (
                 <g
                   key={n.id}
@@ -107,9 +114,19 @@ export default function LineageVisual({ go, selected, select, source, events = [
                   transform={`translate(${n.x},${n.y})`}
                   style={{ cursor: n.ev ? "pointer" : "default" }}
                   onClick={() => { if (n.ev) { select(n.ev); go("evidence"); } }}>
-                  <rect width={n.w} height={n.h} rx="4" />
-                  <text x={n.w / 2} y={n.h / 2 - 2} textAnchor="middle" dominantBaseline="middle">{n.l}</text>
-                  <text x={n.w / 2} y={n.h / 2 + 10} textAnchor="middle" dominantBaseline="middle" className="sub">{n.s}</text>
+                  
+                  {isAgent ? (
+                    <circle cx={n.w / 2} cy={n.h / 2} r={n.h / 2} fill="var(--panel-2)" stroke="var(--line-2)" strokeWidth="1.5" />
+                  ) : isContract ? (
+                    <polygon points={`0,0 ${n.w - 10},0 ${n.w},10 ${n.w},${n.h} 0,${n.h}`} fill="var(--panel-2)" stroke="var(--line-2)" strokeWidth="1.5" />
+                  ) : isPolicy ? (
+                    <polygon points={`${n.w / 2},0 ${n.w},${n.h / 2} ${n.w / 2},${n.h} 0,${n.h / 2}`} fill="var(--panel-2)" stroke="var(--info)" strokeWidth="1.5" />
+                  ) : (
+                    <rect width={n.w} height={n.h} rx={isDeny || isWarn ? "2" : "4"} fill="var(--panel-2)" stroke={isDeny ? "var(--deny)" : isWarn ? "var(--amber)" : "var(--line-2)"} strokeWidth={isDeny || isWarn ? "1.5" : "1"} />
+                  )}
+
+                  <text x={n.w / 2} y={n.h / 2 - 2} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 12, fill: "var(--fg)", fontWeight: 500 }}>{n.l}</text>
+                  <text x={n.w / 2} y={n.h / 2 + 12} textAnchor="middle" dominantBaseline="middle" className="sub mono" style={{ fontSize: 9, fill: isDeny ? "var(--deny)" : isWarn ? "var(--amber)" : "var(--dim)" }}>{n.s}</text>
                 </g>
               );
             })}

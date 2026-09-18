@@ -73,7 +73,7 @@ export default function Overview({ events, go }: any) {
           <Panel flush>
             <div style={{ padding: "16px 20px" }}>
               <div className="bigstat">
-                <div className="n">{untrusted}</div>
+                <div className="n" style={{ color: "var(--amber)" }}>{untrusted}</div>
                 <div className="l">UNTRUSTED INPUTS</div>
               </div>
             </div>
@@ -108,10 +108,10 @@ export default function Overview({ events, go }: any) {
 
         <Panel title="CORE PRINCIPLES">
           <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted)", lineHeight: 1.7, fontSize: 13 }}>
-            <li><strong>Authorization is absolute.</strong> The agent cannot override Cedar / AVP policy enforcement.</li>
-            <li><strong>Enforcement is architectural.</strong> The gateway (PEP) wraps the tool. The tool cannot be reached if the policy denies it.</li>
-            <li><strong>Evidence is cryptographic.</strong> Every decision is chained. Modification breaks the chain.</li>
-            <li><strong>AI is not an authority.</strong> Bedrock analyzes the evidence after the fact. It holds zero runtime authorization capability.</li>
+            <li><strong style={{ color: "var(--fg)" }}>Authorization is absolute.</strong> The agent cannot override Cedar / AVP policy enforcement.</li>
+            <li><strong style={{ color: "var(--fg)" }}>Enforcement is architectural.</strong> The gateway (PEP) wraps the tool. The tool cannot be reached if the policy denies it.</li>
+            <li><strong style={{ color: "var(--fg)" }}>Evidence is cryptographic.</strong> Every decision is chained. Modification breaks the chain.</li>
+            <li><strong style={{ color: "var(--fg)" }}>AI is not an authority.</strong> Bedrock analyzes the evidence after the fact. It holds zero runtime authorization capability.</li>
           </ul>
         </Panel>
       </div>
