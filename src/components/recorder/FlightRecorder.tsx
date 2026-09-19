@@ -8,11 +8,16 @@ import TrustChip from "../shared/TrustChip.tsx";
 import SourceFlag from "../shared/SourceFlag.tsx";
 import BoundaryVisual from "../viz/BoundaryVisual.tsx";
 import { fmtT, short } from "../../data/fixtures.js";
+import { buildControlPlaneModel } from "../../data/controlPlane.ts";
 
 export default function FlightRecorder({ events, idx, setIdx, select, go, source }: any) {
   const safeEvents = Array.isArray(events) ? events : [];
   const currentEvent = safeEvents[idx] || safeEvents[0];
   const isDeny = currentEvent?.decision === "DENY";
+  const model = buildControlPlaneModel(safeEvents, source);
+  const activeSession = model.sessions.find((session) => session.events.some((event: any) => event.id === currentEvent?.id)) || model.sessions[0];
+  const isEnd = idx >= safeEvents.length - 1;
+  const isStart = idx <= 0;
 
   return (
     <>
@@ -28,6 +33,26 @@ export default function FlightRecorder({ events, idx, setIdx, select, go, source
         }
       />
 
+      <Panel flush style={{ marginBottom: "var(--s5)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--s5)", padding: "var(--s4)", flexWrap: "wrap" }}>
+          <div>
+            <div className="mono dim" style={{ fontSize: 9.5, letterSpacing: ".12em" }}>SESSION</div>
+            <div className="mono" style={{ fontSize: 13 }}>{activeSession?.id || "NOT AVAILABLE"}</div>
+          </div>
+          <div>
+            <div className="mono dim" style={{ fontSize: 9.5, letterSpacing: ".12em" }}>REPLAY SOURCE</div>
+            <div className="mono" style={{ fontSize: 13 }}>FRONTEND-DERIVED EVENT ORDER</div>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn" disabled={isStart} onClick={() => { setIdx(Math.max(0, idx - 1)); }}>Previous</button>
+            <button className="btn primary" onClick={() => { setIdx(isEnd ? 0 : Math.min(safeEvents.length - 1, idx + 1)); }}>
+              {isEnd ? "Replay" : "Play Step"}
+            </button>
+            <button className="btn" disabled={isEnd} onClick={() => { setIdx(Math.min(safeEvents.length - 1, idx + 1)); }}>Next</button>
+          </div>
+        </div>
+      </Panel>
+
       <Panel title="REPLAY BOUNDARY SIMULATION" flush style={{ marginBottom: "var(--s5)" }}>
         <BoundaryVisual event={currentEvent} height={260} />
       </Panel>
@@ -37,6 +62,7 @@ export default function FlightRecorder({ events, idx, setIdx, select, go, source
           {currentEvent ? (
             <KV
               rows={[
+                ["SESSION", activeSession?.id || "NOT AVAILABLE"],
                 ["SEQUENCE", `Step ${idx + 1} of ${safeEvents.length}`],
                 ["TIMESTAMP", fmtT(currentEvent.t)],
                 ["ACTION", currentEvent.action],
@@ -84,12 +110,13 @@ export default function FlightRecorder({ events, idx, setIdx, select, go, source
         </Panel>
 
         <Panel title="REPLAY EVENT SEQUENCE" flush>
-          <div className="tablescroll" style={{ maxHeight: 380 }}>
-            <table className="dt">
+          <div className="tablescroll is-scrollable" style={{ maxHeight: 380 }}>
+            <div className="tablehint">SCROLL FOR RESOURCE · EVENT ID STAYS PINNED</div>
+            <table className="dt control-table">
               <thead>
                 <tr>
                   <th>SEQ</th>
-                  <th>ID</th>
+                  <th className="sticky-key">ID</th>
                   <th>ACTION</th>
                   <th>RESOURCE</th>
                   <th>DECISION</th>
@@ -106,7 +133,7 @@ export default function FlightRecorder({ events, idx, setIdx, select, go, source
                       style={{ opacity: isCurrent ? 1 : isPast ? 0.8 : 0.4 }}
                       onClick={() => setIdx(i)}>
                       <td className="m dim">{String(i + 1).padStart(2, "0")}</td>
-                      <td className="m">{e.id}</td>
+                      <td className="m sticky-key">{e.id}</td>
                       <td className="m">{e.action}</td>
                       <td className="m">{e.resource}</td>
                       <td><DecisionChip d={e.decision} /></td>

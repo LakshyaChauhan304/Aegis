@@ -14,6 +14,9 @@ const MAP: any = {
   PARTIAL: ["warn", "\u25d2"],
   LOCAL: ["info", "\u25cf"],
   LIVE: ["allow", "\u2713"],
+  DEGRADED: ["warn", "\u25d2"],
+  TARGET: ["ghost", "\u25cb"],
+  "NOT VERIFIED": ["ghost", "\u25cc"],
 };
 
 export default function StateChip({ s }: any) {

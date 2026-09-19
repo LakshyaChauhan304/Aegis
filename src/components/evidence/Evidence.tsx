@@ -9,6 +9,7 @@ import StateChip from "../shared/StateChip.tsx";
 import SourceFlag from "../shared/SourceFlag.tsx";
 import ChainLink from "./ChainLink.tsx";
 import { short, SESSION } from "../../data/fixtures.js";
+import { eventTraceId } from "../../data/controlPlane.ts";
 
 export default function Evidence({ events, selected, select, go, source, chain }: any) {
   const ev = events.find((e: any) => e.id === selected) || events[events.length - 1];
@@ -24,6 +25,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
         actions={
           <>
             <SourceFlag source={source} />
+            <button className="btn" onClick={() => go("decisions")}>Decision</button>
             <button className="btn" onClick={() => go("lineage")}>Lineage</button>
           </>
         }
@@ -60,12 +62,13 @@ export default function Evidence({ events, selected, select, go, source, chain }
       </Panel>
 
       <Panel title="LEDGER" flush>
-        <div className="tablescroll">
-          <table className="dt">
+        <div className="tablescroll is-scrollable">
+          <div className="tablehint">SCROLL FOR HASHES · EVENT ID STAYS PINNED</div>
+          <table className="dt control-table">
             <thead>
               <tr>
-                <th>SEQ</th><th>EVENT</th><th>T+</th><th>ACTION</th><th>RESOURCE</th>
-                <th>CONTEXT</th><th>DECISION</th><th>PREVIOUS HASH</th><th>CURRENT HASH</th><th>CHAIN</th>
+              <th>SEQ</th><th className="sticky-key">EVENT</th><th>T+</th><th>SESSION</th><th>AGENT</th><th>ACTION</th><th>RESOURCE</th>
+                <th>CONTEXT</th><th>DECISION</th><th>EXECUTION</th><th>PARENT HASH</th><th>EVENT HASH</th><th>CHAIN</th>
               </tr>
             </thead>
             <tbody>
@@ -75,8 +78,10 @@ export default function Evidence({ events, selected, select, go, source, chain }
                   className={"clickable" + (e.id === ev.id ? " sel" : "")}
                   onClick={() => select(e.id)}>
                   <td className="m dim">{String(e.seq).padStart(3, "0")}</td>
-                  <td className="m">{e.id}</td>
+                  <td className="m sticky-key">{e.id}</td>
                   <td className="m dim">{e.t.toFixed(3)}</td>
+                  <td className="m dim">{e.sessionId || (source === "FIXTURE" ? SESSION.id : "NOT AVAILABLE")}</td>
+                  <td className="m dim">{e.agentId || (source === "FIXTURE" ? SESSION.agentId : "NOT AVAILABLE")}</td>
                   <td className="m">{e.action}</td>
                   <td className="m">{e.resource}</td>
                   <td className="m">
@@ -85,6 +90,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
                       : <span className="dim">{e.trust.toLowerCase()}</span>}
                   </td>
                   <td><DecisionChip d={e.decision} /></td>
+                  <td className="m">{e.execution || "NOT AVAILABLE"}</td>
                   <td className="m dim">{e.prev ? short(e.prev) : "genesis"}</td>
                   <td className="m">{short(e.curr)}</td>
                   <td className="m" style={{ color: "var(--allow)" }}>&#10003;</td>
@@ -96,9 +102,10 @@ export default function Evidence({ events, selected, select, go, source, chain }
       </Panel>
 
       <PageHead
-        title={"Evidence detail \u00b7 " + ev.id}
+        title={"Evidence detail \u00b7 " + eventTraceId(ev)}
         actions={
           <>
+            <button className="btn" onClick={() => go("decisions")}>View decision</button>
             <button className="btn" onClick={() => go("lineage")}>View lineage</button>
             <button className="btn" onClick={() => go("recorder")}>Replay</button>
             <button className="btn" onClick={() => go("investigations")}>Investigate</button>

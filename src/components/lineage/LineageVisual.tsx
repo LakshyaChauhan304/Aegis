@@ -2,6 +2,8 @@ import React from "react";
 import PageHead from "../shared/PageHead.tsx";
 import Panel from "../shared/Panel.tsx";
 import SourceFlag from "../shared/SourceFlag.tsx";
+import Chip from "../shared/Chip.tsx";
+import Note from "../shared/Note.tsx";
 import { LINEAGE_NODES, LINEAGE_EDGES } from "../../data/fixtures.js";
 
 function buildLiveLineage(events: any[]) {
@@ -48,6 +50,18 @@ export default function LineageVisual({ go, selected, select, source, events = [
       />
 
       <Panel flush>
+        <div style={{ padding: "var(--s4)", borderBottom: "1px solid var(--line)", display: "flex", gap: "var(--s3)", flexWrap: "wrap", alignItems: "center" }}>
+          <Chip kind={useLive ? "info" : "ghost"}>{useLive ? "DERIVED LINEAGE" : "FIXTURE LINEAGE"}</Chip>
+          <Chip kind="ghost">SOURCE / CONTEXT</Chip>
+          <span className="dim" aria-hidden="true">&rarr;</span>
+          <Chip kind="ghost">REQUEST</Chip>
+          <span className="dim" aria-hidden="true">&rarr;</span>
+          <Chip kind="ghost">DECISION</Chip>
+          <span className="dim" aria-hidden="true">&rarr;</span>
+          <Chip kind="ghost">EVIDENCE</Chip>
+          <span className="dim" aria-hidden="true">&rarr;</span>
+          <Chip kind="ghost">HASH CHAIN</Chip>
+        </div>
         <div className="lineagewrap">
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
             <defs>
@@ -116,11 +130,11 @@ export default function LineageVisual({ go, selected, select, source, events = [
           </svg>
         </div>
         <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
-          <span className="muted">
+          <Note kind="info">
             {useLive
               ? "EVIDENCE-BACKED LINEAGE: this view uses recorded event order, trust labels, authorization provider metadata, and SHA-256 linear hash-chain links. It does not claim mathematical causality."
               : "DEMO/FALLBACK: this fixture view is illustrative and is not represented as live backend evidence."}
-          </span>
+          </Note>
         </div>
       </Panel>
     </>

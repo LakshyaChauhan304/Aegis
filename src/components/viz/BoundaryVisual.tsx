@@ -22,8 +22,12 @@ export default function BoundaryVisual({ height = 400, event = null, compact = f
 
   useEffect(() => {
     if (!mountRef.current) return;
-    const w = mountRef.current.clientWidth;
+    const mount = mountRef.current;
+    mount.replaceChildren();
+    const w = mount.clientWidth;
     const h = height;
+    let rafId = 0;
+    let disposed = false;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(theme.bg);
@@ -33,7 +37,7 @@ export default function BoundaryVisual({ height = 400, event = null, compact = f
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(w, h);
-    mountRef.current.appendChild(renderer.domElement);
+    mount.replaceChildren(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -75,9 +79,9 @@ export default function BoundaryVisual({ height = 400, event = null, compact = f
     };
 
     const animate = () => {
-      requestAnimationFrame(animate);
+      if (disposed) return;
       const s = stateRef.current;
-      if (!s) return;
+      if (!s || s.renderer !== renderer) return;
 
       if (s.animating) {
         s.t += 0.02;
@@ -98,15 +102,22 @@ export default function BoundaryVisual({ height = 400, event = null, compact = f
 
       controls.update();
       renderer.render(scene, camera);
+      rafId = requestAnimationFrame(animate);
     };
     animate();
 
     return () => {
+      disposed = true;
+      cancelAnimationFrame(rafId);
+      controls.dispose();
       renderer.dispose();
-      if (mountRef.current && renderer.domElement) {
-        mountRef.current.removeChild(renderer.domElement);
+      renderer.forceContextLoss();
+      if (mount && renderer.domElement.parentElement === mount) {
+        mount.replaceChildren();
       }
-      stateRef.current = null;
+      if (stateRef.current?.renderer === renderer) {
+        stateRef.current = null;
+      }
     };
   }, [height, compact]);
 

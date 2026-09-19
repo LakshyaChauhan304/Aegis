@@ -5,9 +5,14 @@ import KV from "../shared/KV.tsx";
 import Note from "../shared/Note.tsx";
 import SourceFlag from "../shared/SourceFlag.tsx";
 import aegisApi from "../../data/aegisApi.ts";
+import EvaluationChain from "../decisions/EvaluationChain.tsx";
+import DecisionChip from "../shared/DecisionChip.tsx";
+import TrustChip from "../shared/TrustChip.tsx";
+import { SESSION } from "../../data/fixtures.js";
 
-export default function Policies({ go }: any) {
+export default function Policies({ go, events = [], selected }: any) {
   const [policy, setPolicy] = useState<any>(null);
+  const ev = events.find((event: any) => event.id === selected) || events[events.length - 1];
 
   useEffect(() => {
     let active = true;
@@ -52,9 +57,24 @@ export default function Policies({ go }: any) {
             ]}
           />
         </Panel>
-        <div style={{ gridColumn: "2 / -1" }}>
+        <Panel title="CURRENT REQUEST CONTEXT">
+          <KV
+            rows={[
+              ["PRINCIPAL", ev?.agentId || SESSION.agentId],
+              ["ACTION", ev?.action || "NOT AVAILABLE"],
+              ["RESOURCE", ev?.resource || "NOT AVAILABLE"],
+              ["CONTEXT / TRUST", ev ? <TrustChip t={ev.trust} /> : "NOT AVAILABLE"],
+              ["CONTRACT", ev?.sessionId ? "NOT AVAILABLE" : SESSION.contractId],
+              ["CEDAR RESULT", ev ? <DecisionChip d={ev.decision} /> : "NOT AVAILABLE"],
+              ["ARGUMENTS", "NOT EXPOSED BY BACKEND"],
+            ]}
+          />
+        </Panel>
+        <div style={{ gridColumn: "1 / -1" }}>
           <Panel title={"CEDAR SOURCE \u00b7 " + p.file} flush>
-            <pre className="cedar">{p.sourceText}</pre>
+            <div className="policy-source">
+              <pre className="cedar">{p.sourceText}</pre>
+            </div>
             <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
               <Note kind="info">
                 This view displays the current Cedar policy loaded by the backend. It does not use
@@ -64,6 +84,20 @@ export default function Policies({ go }: any) {
           </Panel>
         </div>
       </div>
+
+      {ev ? (
+        <Panel title="FRONTEND-DERIVED AUTHORIZATION EXPLANATION" flush>
+          <div style={{ padding: "var(--s4)" }}>
+            <EvaluationChain ev={ev} />
+          </div>
+          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
+            <Note>
+              This explanation is derived from the selected event fields. The backend exposes the
+              live Cedar policy source and final event reason, but not full Cedar diagnostics.
+            </Note>
+          </div>
+        </Panel>
+      ) : null}
     </>
   );
 }

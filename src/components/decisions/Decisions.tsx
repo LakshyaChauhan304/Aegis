@@ -5,11 +5,14 @@ import KV from "../shared/KV.tsx";
 import Note from "../shared/Note.tsx";
 import DecisionChip from "../shared/DecisionChip.tsx";
 import TrustChip from "../shared/TrustChip.tsx";
+import StateChip from "../shared/StateChip.tsx";
 import EvaluationChain from "./EvaluationChain.tsx";
 import { SESSION } from "../../data/fixtures.js";
+import { eventTraceId } from "../../data/controlPlane.ts";
 
 export default function Decisions({ events, selected, select, go }: any) {
   const ev = events.find((e: any) => e.id === selected) || events[events.length - 1];
+  const contractLabel = ev.sessionId ? "NOT AVAILABLE" : SESSION.contractId;
 
   return (
     <>
@@ -19,12 +22,13 @@ export default function Decisions({ events, selected, select, go }: any) {
       />
 
       <Panel title="DECISION LOG" flush>
-        <div className="tablescroll">
-          <table className="dt">
+        <div className="tablescroll is-scrollable">
+          <div className="tablehint">SCROLL FOR FULL POLICY REASON · EVENT ID STAYS PINNED</div>
+          <table className="dt control-table">
             <thead>
               <tr>
                 <th>T+</th><th>PRINCIPAL</th><th>ACTION</th><th>RESOURCE</th>
-                <th>CONTEXT</th><th>DECISION</th><th>REASON</th><th>EVENT</th>
+                <th>CONTEXT</th><th>DECISION</th><th>REASON</th><th className="sticky-actions">EVENT</th>
               </tr>
             </thead>
             <tbody>
@@ -44,7 +48,7 @@ export default function Decisions({ events, selected, select, go }: any) {
                   </td>
                   <td><DecisionChip d={e.decision} /></td>
                   <td className="m dim">{e.reason}</td>
-                  <td className="m dim">{e.id}</td>
+                  <td className="m sticky-actions">{e.id}</td>
                 </tr>
               ))}
             </tbody>
@@ -53,10 +57,12 @@ export default function Decisions({ events, selected, select, go }: any) {
       </Panel>
 
       <PageHead
-        title={"Decision detail \u00b7 " + ev.id}
+        title={"Decision detail \u00b7 " + eventTraceId(ev)}
         desc={ev.detail}
         actions={
           <>
+            <button className="btn" onClick={() => go("contracts")} disabled={contractLabel === "NOT AVAILABLE"}>Task contract</button>
+            <button className="btn" onClick={() => go("policies")}>Policy</button>
             <button className="btn" onClick={() => go("evidence")}>Evidence</button>
             <button className="btn" onClick={() => go("lineage")}>Lineage</button>
           </>
@@ -67,16 +73,17 @@ export default function Decisions({ events, selected, select, go }: any) {
         <Panel title="SECURITY RECORD">
           <KV
             rows={[
+              ["TRACE ID", eventTraceId(ev)],
               ["WHO", `${SESSION.agentName} (Agent::"${ev.agentId || SESSION.agentId}")`],
               ["SESSION", ev.sessionId || SESSION.id],
               ["WHAT", ev.action],
               ["RESOURCE", ev.resource],
-              ["TASK CONTRACT", ev.sessionId ? "NOT RECORDED" : SESSION.contractId],
+              ["TASK CONTRACT", contractLabel],
               ["CONTEXT", <TrustChip t={ev.trust} />],
               ["DECISION", <DecisionChip d={ev.decision} />],
               ["REASON", ev.reason],
               ["AUTHORITY", ev.authProvider || "UNKNOWN"],
-              ["EXECUTION", ev.execution],
+              ["EXECUTION", <StateChip s={ev.execution || "UNAVAILABLE"} />],
               ["EXPOSURE", ev.bytes == null ? "UNKNOWN" : ev.bytes + " BYTES"],
               ["HTTP", ev.http == null ? "UNKNOWN" : String(ev.http)],
             ]}
@@ -89,9 +96,9 @@ export default function Decisions({ events, selected, select, go }: any) {
           </div>
           <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
             <Note kind="info">
-              This screen displays the evaluation. It is not what enforces it. Enforcement
-              happens at the Aegis gateway in front of the tool: the request is refused there,
-              so the tool is never invoked. Removing this screen would not change the outcome.
+              This is an event-backed explanation. The backend exposes the final decision and
+              reason, not a first-class decisionId or full Cedar diagnostic trace. Enforcement
+              happens at the Aegis gateway before the protected tool runs.
             </Note>
           </div>
         </Panel>

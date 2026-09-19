@@ -188,13 +188,16 @@ export default function SecurityTests() {
       />
 
       <Panel title="CORE SECURITY INVARIANTS" flush style={{ marginBottom: "var(--s5)" }}>
-        <div className="tablescroll">
-          <table className="dt">
+        <div className="tablescroll is-scrollable">
+          <div className="tablehint">SCROLL FOR RESULT DETAILS · CLAIM STAYS PINNED</div>
+          <table className="dt control-table">
             <thead>
               <tr>
-                <th>INVARIANT</th>
+                <th className="sticky-key">CLAIM</th>
+                <th>MECHANISM</th>
+                <th>TEST</th>
+                <th>OBSERVABLE RESULT</th>
                 <th>STATE</th>
-                <th>SPECIFICATION & OUTCOME</th>
                 <th>EVIDENCE ARTIFACT</th>
                 <th>DATA EXPOSURE</th>
               </tr>
@@ -202,9 +205,11 @@ export default function SecurityTests() {
             <tbody>
               {invariants.map((t) => (
                 <tr key={t.id}>
-                  <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{t.name}</td>
-                  <td><StateChip s={t.status === "PASSED" ? "VERIFIED" : t.status} /></td>
-                  <td className="muted">{t.details}</td>
+                  <td className="sticky-key claim-cell" style={{ fontWeight: 600 }}>{t.name}</td>
+                  <td className="muted readable-cell">Frontend invokes existing PEP / ledger APIs</td>
+                  <td className="muted readable-cell">{t.category === "INVARIANT" ? "Live verification suite" : "Static attack matrix"}</td>
+                  <td className="muted readable-cell">{t.details}</td>
+                  <td><StateChip s={t.status === "PASSED" ? "LIVE_VERIFIED" : t.status} /></td>
                   <td className="m dim" style={{ whiteSpace: "nowrap" }}>{t.evidence || "—"}</td>
                   <td className="m" style={{ color: t.bytesExposed === 0 ? "var(--allow)" : "var(--fg)" }}>
                     {t.bytesExposed != null ? `${t.bytesExposed} BYTES` : "—"}
@@ -229,25 +234,28 @@ export default function SecurityTests() {
       )}
 
       <Panel title="AGENT ATTACK VECTOR MATRIX" flush>
-        <div className="tablescroll">
-          <table className="dt">
+        <div className="tablescroll is-scrollable">
+          <div className="tablehint">SCROLL FOR MECHANISM AND RESULT · CLAIM STAYS PINNED</div>
+          <table className="dt control-table">
             <thead>
               <tr>
-                <th>ATTACK VECTOR</th>
+                <th className="sticky-key">CLAIM</th>
+                <th>MECHANISM</th>
+                <th>TEST</th>
+                <th>OBSERVABLE RESULT</th>
                 <th>STATE</th>
-                <th>DESCRIPTION</th>
                 <th>EVIDENCE RECORD</th>
-                <th>DEFENSE OUTCOME</th>
               </tr>
             </thead>
             <tbody>
               {TESTS.map((t: any) => (
                 <tr key={t.name}>
-                  <td style={{ fontWeight: 500, whiteSpace: "nowrap" }}>{t.name}</td>
+                  <td className="sticky-key claim-cell" style={{ fontWeight: 500 }}>{t.name}</td>
+                  <td className="muted readable-cell">{t.desc}</td>
+                  <td className="muted readable-cell">Fixture/static security claim</td>
+                  <td className="muted readable-cell">{t.outcome}</td>
                   <td><StateChip s={t.state} /></td>
-                  <td className="muted">{t.desc}</td>
                   <td className="m dim">{t.evidence}</td>
-                  <td className="muted">{t.outcome}</td>
                 </tr>
               ))}
             </tbody>

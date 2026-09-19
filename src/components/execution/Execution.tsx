@@ -8,12 +8,17 @@ import ProvenancePanel from "./ProvenancePanel.tsx";
 import BoundaryVisual from "../viz/BoundaryVisual.tsx";
 import aegisApi from "../../data/aegisApi.ts";
 import { SESSION } from "../../data/fixtures.js";
+import DecisionChip from "../shared/DecisionChip.tsx";
+import TrustChip from "../shared/TrustChip.tsx";
+import StateChip from "../shared/StateChip.tsx";
+import Note from "../shared/Note.tsx";
 
 export default function Execution({ events, idx, go, select, refresh }: any) {
   const visible = events.slice(0, idx + 1);
   const denied = visible.find((e: any) => e.decision === "DENY");
   const untrusted = visible.find((e: any) => e.trust === "UNTRUSTED_EXTERNAL");
   const touched = new Set(visible.map((e: any) => e.resource));
+  const current = events[idx] || events[events.length - 1];
 
   const [runningHero, setRunningHero] = useState(false);
   const [heroStatus, setHeroStatus] = useState<string | null>(null);
@@ -137,6 +142,37 @@ export default function Execution({ events, idx, go, select, refresh }: any) {
           </div>
         </div>
         <BoundaryVisual event={events[idx]} height={200} compact />
+      </Panel>
+
+      <Panel title="REQUEST AUTHORIZATION PATH" flush style={{ marginBottom: "var(--s5)" }}>
+        <div className="auth-path">
+          {[
+            ["REQUEST", current?.resource || "NOT AVAILABLE", <TrustChip t={current?.trust || "UNKNOWN"} />],
+            ["TASK CONTRACT", current?.sessionId ? "NOT RECORDED" : SESSION.contractId, <StateChip s={current?.sessionId ? "UNAVAILABLE" : "FIXTURE"} />],
+            ["CONTEXT / PROVENANCE", current?.trust || "UNKNOWN", <span className="mono dim">origin travels with request</span>],
+            ["CEDAR", current?.authProvider || "LOCAL / FALLBACK", <span className="mono dim">runtime policy gate</span>],
+            ["DECISION", current?.decision || "UNKNOWN", <DecisionChip d={current?.decision} />],
+            ["PEP / EXECUTOR", current?.decision === "DENY" ? "STOP BEFORE EXECUTOR" : current?.execution || "UNKNOWN", <StateChip s={current?.decision === "DENY" ? "NOT_EXECUTED" : current?.execution || "UNAVAILABLE"} />],
+          ].map(([label, value, right]: any) => {
+            const inactiveExecutor = label === "PEP / EXECUTOR" && current?.decision === "DENY";
+            return (
+              <div
+                key={label}
+                className={"auth-step" + (inactiveExecutor ? " stop" : "")}>
+                <div className="l">{label}</div>
+                <div className="n mono" style={{ wordBreak: "break-word" }}>{value}</div>
+                <div className="s" style={{ marginTop: 8 }}>{right}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
+          <Note kind={current?.decision === "DENY" ? "deny" : "info"}>
+            {current?.decision === "DENY"
+              ? "DENY path: Cedar returns a denial at the gateway, and the executor remains inactive."
+              : "ALLOW path: the protected executor is reached only after the policy decision."}
+          </Note>
+        </div>
       </Panel>
 
       {denied ? (

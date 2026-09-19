@@ -4,6 +4,7 @@ import Panel from "../shared/Panel.tsx";
 import Chip from "../shared/Chip.tsx";
 import KV from "../shared/KV.tsx";
 import Note from "../shared/Note.tsx";
+import SourceFlag from "../shared/SourceFlag.tsx";
 import { CONTRACT } from "../../data/fixtures.js";
 
 function ScopeList({ items, kind }: any) {
@@ -32,7 +33,13 @@ export default function Contracts({ go }: any) {
       <PageHead
         title="Task Contracts"
         desc="This surface shows declared session scope from demo/fallback data. Signed contract enforcement is not implemented in the current backend."
-        actions={<button className="btn" onClick={() => go("execution")}>Agent execution</button>}
+        actions={
+          <>
+            <SourceFlag source="FIXTURE" />
+            <button className="btn" onClick={() => go("execution")}>Agent execution</button>
+            <button className="btn" onClick={() => go("policies")}>Policy</button>
+          </>
+        }
       />
 
       <Panel flush style={{ marginBottom: "var(--s5)" }}>
@@ -43,6 +50,7 @@ export default function Contracts({ go }: any) {
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
             <Chip kind="ghost">FIXTURE SCOPE</Chip>
+            <Chip kind="warn">SIGNATURE NOT VERIFIED</Chip>
             <Chip kind="ghost">TTL {c.ttl}</Chip>
             <Chip kind="info">SESSION {c.session}</Chip>
           </div>
@@ -69,6 +77,8 @@ export default function Contracts({ go }: any) {
           <div className="mono dim" style={{ fontSize: 9.5, letterSpacing: ".12em", margin: "16px 0 6px" }}>NETWORK SCOPE</div>
           <ScopeList items={c.network} kind="allow" />
           <ScopeList items={c.networkDeny} kind="deny" />
+          <div className="mono dim" style={{ fontSize: 9.5, letterSpacing: ".12em", margin: "16px 0 6px" }}>TRUST CONSTRAINTS</div>
+          <ScopeList items={["UNTRUSTED_EXTERNAL is carried as context", "Trust does not imply malicious intent"]} kind="info" />
         </Panel>
 
         <Panel title="FILESYSTEM SCOPE">
@@ -99,6 +109,23 @@ export default function Contracts({ go }: any) {
               The values on this page are retained as explicitly labeled demo/fallback scope data.
             </Note>
           </div>
+        </div>
+      </Panel>
+
+      <Panel title="CONTRACT TO POLICY RELATIONSHIP">
+        <div style={{ display: "flex", gap: "var(--s3)", alignItems: "center", flexWrap: "wrap" }}>
+          <Chip kind="ghost">TASK CONTRACT · FIXTURE</Chip>
+          <span className="dim" aria-hidden="true">&rarr;</span>
+          <Chip kind="info">CEDAR POLICY · LIVE LOCAL SOURCE</Chip>
+          <span className="dim" aria-hidden="true">&rarr;</span>
+          <Chip kind="ghost">PER-REQUEST DECISION</Chip>
+          <button className="btn sm" style={{ marginLeft: "auto" }} onClick={() => go("policies")}>Open policy</button>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Note kind="warn">
+            The frontend can show the intended relationship, but the live backend does not expose
+            a cryptographically verified contract binding on each event.
+          </Note>
         </div>
       </Panel>
     </>

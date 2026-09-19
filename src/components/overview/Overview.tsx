@@ -2,13 +2,14 @@ import React from "react";
 import PageHead from "../shared/PageHead.tsx";
 import Panel from "../shared/Panel.tsx";
 import StateChip from "../shared/StateChip.tsx";
-import BoundaryVisual from "../viz/BoundaryVisual.tsx";
+import AegisRuntimeArchitecture from "../viz/AegisRuntimeArchitecture.tsx";
 import { SESSION } from "../../data/fixtures.js";
 
-export default function Overview({ events, go }: any) {
+export default function Overview({ events, idx, go, chain, analysis }: any) {
   const allow = events.filter((e: any) => e.decision === "ALLOW").length;
   const deny = events.filter((e: any) => e.decision === "DENY").length;
   const untrusted = events.filter((e: any) => e.trust === "UNTRUSTED_EXTERNAL").length;
+  const currentEvent = events[idx] || events[events.length - 1] || null;
 
   return (
     <>
@@ -18,7 +19,7 @@ export default function Overview({ events, go }: any) {
       />
 
       <Panel title="RUNTIME ARCHITECTURE &middot; THE BOUNDARY IS THE PEP" flush>
-        <BoundaryVisual height={320} />
+        <AegisRuntimeArchitecture height={320} event={currentEvent} chain={chain} analysis={analysis} />
       </Panel>
 
       <div className="grid g4" style={{ marginBottom: "var(--s5)" }}>

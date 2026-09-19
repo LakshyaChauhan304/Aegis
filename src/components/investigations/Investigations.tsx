@@ -4,6 +4,7 @@ import Panel from "../shared/Panel.tsx";
 import Chip from "../shared/Chip.tsx";
 import Note from "../shared/Note.tsx";
 import SourceFlag from "../shared/SourceFlag.tsx";
+import DecisionChip from "../shared/DecisionChip.tsx";
 import aegisApi from "../../data/aegisApi.ts";
 import { SESSION } from "../../data/fixtures.js";
 
@@ -62,6 +63,30 @@ export default function Investigations({ events, analysis, analysisSource, setAn
               {(analysisSource || "UNAVAILABLE").replace(/_/g, " ")}
             </Chip>
           </div>
+        </div>
+      </Panel>
+
+      <Panel title="AUTHORIZATION VS POST-HOC INVESTIGATION" flush>
+        <div style={{ padding: "var(--s4)", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "var(--s3)" }}>
+          {[
+            ["RUNTIME REQUEST", targetEvent?.resource || "NO_EVENT_RECORDED", "agent asks for a tool operation"],
+            ["CEDAR AUTHORIZATION", targetEvent?.authProvider || "LOCAL / FALLBACK", "runtime authority"],
+            ["ALLOW / DENY", targetEvent?.decision || "UNKNOWN", <DecisionChip d={targetEvent?.decision} />],
+            ["RECORDED EVIDENCE", targetEvent?.id || "NO_EVENT_RECORDED", "hash-chain event"],
+            ["POST-HOC INVESTIGATION", analysis.generatedBy || "NOT RUN", "advisory analysis only"],
+          ].map(([label, value, sub]: any) => (
+            <div key={label} className="bx">
+              <div className="l">{label}</div>
+              <div className="n mono" style={{ wordBreak: "break-word" }}>{value}</div>
+              <div className="s" style={{ marginTop: 8 }}>{sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)" }}>
+          <Note kind="info">
+            Bedrock is post-hoc only. It analyzes recorded evidence after Cedar has already made
+            the runtime decision and never participates in authorization.
+          </Note>
         </div>
       </Panel>
 
