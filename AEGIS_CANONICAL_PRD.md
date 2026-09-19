@@ -9,11 +9,11 @@
 ---
 ## Current Phase 4A Implementation Boundary
 
-This PRD describes the product target architecture. The repository currently implements a local Express PEP with local Cedar evaluation, optional Amazon Verified Permissions comparison, a process-local SHA-256 linear evidence hash chain, immutable hash-covered authorization/execution events, separate archival receipt events, direct post-execution archival calls to EventBridge, DynamoDB, and S3 Object Lock, bounded session reconstruction from local evidence, and post-hoc Bedrock investigation.
+This PRD describes the product target architecture. The repository currently implements a local Express PEP with local Cedar evaluation, optional Amazon Verified Permissions comparison, a process-local SHA-256 linear evidence hash chain, immutable hash-covered authorization/execution events, separate archival receipt events, direct post-execution archival calls to EventBridge, DynamoDB, and S3 Object Lock, bounded session reconstruction from local evidence, and post-hoc Bedrock investigation from an allowlisted grounding envelope.
 
 Live AWS resources created in `ap-southeast-2`: AVP policy store `4VKzAMGEYyBg3ZkcpULube`, DynamoDB table `AegisEvidence`, S3 bucket `aegis-evidence-643220021031-ap-southeast-2` with Object Lock enabled, and the default EventBridge bus.
 
-Implemented in the current repository: a trusted local Task Contract registry that resolves `contractId` before Cedar/AVP authorization, backend-normalized tool/action/resource/argument metadata, immutable hash-covered execution evidence for the current filesystem path, separate archival receipts linked to primary event hashes, safe provenance-source hashing/redaction, bounded session reconstruction, and a static executor registry containing only the current `fs:read` filesystem boundary. Not implemented in the current repository: API Gateway, Lambda, KMS, cryptographic signed Task Contract verification, HMAC/session tokens, npm/git/shell/network/MCP execution, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
+Implemented in the current repository: a trusted local Task Contract registry that resolves `contractId` before Cedar/AVP authorization, backend-normalized tool/action/resource/argument metadata, immutable hash-covered execution evidence for the current filesystem path, separate archival receipts linked to primary event hashes, safe provenance-source hashing/redaction, bounded session reconstruction, structured Bedrock investigation results with event/hash references, and a static executor registry containing only the current `fs:read` filesystem boundary. Not implemented in the current repository: API Gateway, Lambda, KMS, cryptographic signed Task Contract verification, HMAC/session tokens, npm/git/shell/network/MCP execution, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
 
 ---
 
@@ -73,7 +73,7 @@ To prevent over-claiming and survive adversarial scrutiny from AWS Principal Eng
 3. **Truth 3: Aegis does not claim mathematical causality.**  
    Aegis models **Evidence-Backed Lineage**. When an agent ingests an untrusted artifact (e.g., an external `README.md`) and subsequently attempts an out-of-scope credential read (`.env`), Aegis correlates them via temporal sequence, context provenance, and monotonic taint tracking within a Directed Acyclic Graph (DAG).
 4. **Truth 4: Amazon Bedrock has zero runtime authorization authority.**  
-   Runtime authorization decisions are deterministic for requests evaluated against the declared policy, evaluated via Cedar against structured JSON payloads. Bedrock (configured model) is invoked exclusively *post-hoc* within a bounded grounding envelope to summarize evidence, evaluate blast radius, and propose policy revisions for human sign-off.
+   Runtime authorization decisions are deterministic for requests evaluated against the declared policy, evaluated via Cedar against structured JSON payloads. Bedrock (configured model) is invoked exclusively *post-hoc* within a bounded grounding envelope to generate a forensic synthesis with evidence references for human review.
 5. **Truth 5: Aegis enforces through architecture, not magic.**  
    The Aegis Gateway is inevitable only when the host environment isolates the agent from direct OS sockets, credentials, and host networking. If an agent runs with root privileges and ambient AWS IAM access, it can bypass any proxy. Aegis requires strict sandbox boundaries.
 
@@ -120,7 +120,7 @@ Every autonomous agent session lifecycle is governed across five discrete stages
 
 ### Stage 4: Explain (Evidence-Backed Lineage & Bedrock Synthesis)
 - Generates an evidence-backed lineage DAG linking the offending request to observable upstream context and events.
-- Bedrock configured Bedrock model processes the recorded evidence envelope to generate human-readable forensics, calculate blast radius, and output draft Cedar policy patches.
+- Bedrock configured model processes an allowlisted recorded-evidence envelope to generate human-readable forensic synthesis with event/hash references for human review.
 
 ### Stage 5: Replay (Forensic Reconstruction & Tamper Evidence)
 - Every step is hashed with SHA-256 and chained: `H_n = SHA256(H_{n-1} || Action || Resource || Decision)`.
@@ -200,7 +200,7 @@ A critical judge attack vector is conflating in-process Cedar evaluation with cl
 4. **Amazon DynamoDB:** Current implementation performs direct post-execution evidence archival with `dynamodb:PutItem`. Active session state, token storage, and lineage graph storage remain target architecture.
 5. **Amazon S3 (Object Lock Compliance Mode):** Current implementation can write evidence objects with COMPLIANCE retention headers to an Object Lock-enabled bucket. This is tamper-resistant archival for retained object versions, not a universal permanence claim.
 6. **AWS Key Management Service (KMS):** Target capability only. KMS signing is not implemented in the current repository.
-7. **Amazon Bedrock (configured Bedrock model — Forensic Analysis & Synthesis Engine):** Consumes the recorded evidence envelope strictly post-hoc to output evidence-backed incident summaries, risk blast-radius metrics, and advisory human-in-the-loop policy diffs. Bedrock has zero runtime authorization authority.
+7. **Amazon Bedrock (configured Bedrock model — Forensic Analysis & Synthesis Engine):** Consumes the bounded recorded-evidence envelope strictly post-hoc to output evidence-backed incident summaries with references to immutable event IDs and hashes. Bedrock has zero runtime authorization authority.
 
 ---
 
@@ -362,7 +362,7 @@ Step 4: READ .env
 Step 6: Forensic Synthesis (On Demand)
         Operator clicks [WHY?] -> Evidence Lineage DAG traces Step 4 injection to Step 5.
         Operator clicks [REPLAY] -> Scrubs state timeline with hash-chain verification.
-        Operator clicks [INVESTIGATE] -> Bedrock summarizes incident & generates patch.
+        Operator clicks [INVESTIGATE] -> Bedrock generates structured forensic synthesis from the bounded grounding envelope.
 ```
 
 ---
@@ -425,9 +425,9 @@ Every engineering requirement in Aegis is bound to a strict 6-stage proof chain:
 8. **How do you know the audit logs haven't been altered?**  
    *“Each event is chained via SHA-256 hashes (`ParentHash` $\rightarrow$ `StepHash`). The archival path can write retained object versions to S3 with Object Lock headers.”*
 9. **Why use Amazon Bedrock?**  
-   *“For evidence synthesis and incident explanation, not authorization. Bedrock operates strictly post-hoc on the recorded evidence envelope.”*
+   *“For evidence synthesis and incident explanation, not authorization. Bedrock operates strictly post-hoc on a bounded, allowlisted grounding envelope derived from recorded evidence.”*
 10. **What happens if Bedrock hallucinates?**  
-    *“Bedrock has zero runtime security authority. It cannot unblock an action or deploy a policy. Its output is an advisory diff for human security review.”*
+    *“Bedrock has zero runtime security authority. It cannot unblock an action or deploy a policy. Its output is a grounded forensic synthesis for human security review.”*
 11. **Why AWS?**  
     *“Amazon Verified Permissions provides the remote Cedar comparison path, EventBridge is currently a publisher, S3 Object Lock provides retention-backed archival for written evidence objects, and Bedrock provides post-hoc analysis.”*
 12. **Isn't this just observability?**  
@@ -489,7 +489,7 @@ To ensure 100% demo reliability under live stage pressure, Aegis incorporates 10
    *Fallback Verification Chain:*  
    Current repository: trusted local Task Contract registry -> `server/policies/devfix.cedar` -> local Cedar evaluation. Target architecture may add signed policy bundles and KMS verification, but they are not implemented here.
 2. **Amazon Bedrock Slow / Rate-Limited:**  
-   *Recovery:* The UI displays a pre-cached, cryptographically verified grounding envelope and synthesis report from baseline test `test_grounded_envelope_01`.
+   *Recovery:* Runtime authorization remains unaffected. The investigation endpoint reports a safe degraded Bedrock status while recorded evidence and local reconstruction remain inspectable.
 3. **Accidental State Corruption in Demo:**  
    *Recovery:* The top navigation bar includes an instant **Reset to Clean State** button that wipes transient state and re-seeds the pristine 6-step DevFix scenario in <100ms.
 4. **Judge Interrupts at 30 Seconds with a Deep Question:**  

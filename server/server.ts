@@ -117,10 +117,10 @@ async function startServer() {
       return res.status(404).json({ error: "Event not found" });
     }
     try {
-      const investigationStatus = await analyzeEvidence(event);
+      const investigationStatus = await analyzeEvidence(event.eventId);
       return res.json({ event, investigationStatus });
-    } catch (err: any) {
-      return res.status(500).json({ error: "Bedrock failure", details: err.message });
+    } catch {
+      return res.status(500).json({ error: "Bedrock failure", errorClassification: "BEDROCK_INVOCATION_FAILED" });
     }
   });
 

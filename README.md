@@ -17,7 +17,7 @@ Current implementation boundaries:
 - Runtime authorization is local Cedar plus optional AVP comparison; if AVP differs from local Cedar, Aegis fails closed.
 - Evidence is a process-local SHA-256 linear hash chain. Primary authorization/execution events include contract metadata, normalized operation metadata, authorization outcome, execution outcome, byte count, HTTP status, and executor identity. AWS archival outcomes are recorded as separate archival receipt events that reference the immutable primary event hash. DynamoDB and S3 are post-execution archival sinks, not replay storage for the current UI.
 - EventBridge is currently a publisher only; no EventBridge consumer or event-driven archival pipeline is implemented.
-- Bedrock is post-hoc only. `BEDROCK_MODEL_ID` is required to select the model/inference profile; no hardcoded model fallback is used. Live invocation currently requires account-level Bedrock model access/use-case approval.
+- Bedrock is post-hoc only. Investigation builds a bounded allowlisted grounding envelope from immutable ledger events and application-computed hash-chain verification, then asks the configured model for structured advisory synthesis with event/hash references. `BEDROCK_MODEL_ID` is required to select the model/inference profile; no hardcoded model fallback is used. Live invocation currently requires account-level Bedrock model access/use-case approval.
 - Trusted local Task Contract enforcement is implemented through a backend registry resolved by `contractId`. The backend normalizes tool/action/resource/argument metadata before Cedar/AVP authorization and records the normalized operation identity in evidence. KMS, cryptographic signed Task Contract verification, HMAC/session tokens, shell execution, network enforcement, container isolation, API Gateway, and Lambda are not implemented in this repository.
 - Protected execution is dispatched through a static backend executor registry after authorization. The only registered executor is `fs:fs:read`; npm, git, shell, network, and MCP execution remain unimplemented. Session reconstruction is exposed through a bounded backend endpoint that returns ordered ledger events for a session and the current global hash-chain verification result.
 
@@ -57,7 +57,7 @@ Existing security systems fail to solve this:
 7. **The Post-Hoc Triad:**
    - Click **[WHY?]** $\rightarrow$ Renders Evidence-Backed Lineage DAG connecting Task $\rightarrow$ Injected README $\rightarrow$ `.env` request $\rightarrow$ Policy DENY.
    - Click **[REPLAY]** $\rightarrow$ Scrubs the recorded authorization/execution timeline with tamper-evident SHA-256 linear hash-chain verification.
-   - Click **[INVESTIGATE]** $\rightarrow$ Amazon Bedrock (configured model) processes the recorded evidence envelope to summarize blast radius and propose refined Cedar policies for human sign-off.
+   - Click **[INVESTIGATE]** $\rightarrow$ Amazon Bedrock (configured model) processes a bounded grounding envelope derived from recorded evidence and returns a structured forensic synthesis with event/hash references for human review.
 
 ---
 
@@ -117,7 +117,7 @@ Existing security systems fail to solve this:
 - **Amazon EventBridge:** Current implementation is a publisher only using `events:PutEvents`; no EventBridge consumer pipeline is implemented.
 - **Amazon DynamoDB:** Current implementation performs direct post-execution evidence archival with `dynamodb:PutItem`; it is not the current UI replay source.
 - **Amazon S3 (Object Lock Compliance Mode):** Current implementation writes evidence objects with Object Lock retention headers to support tamper-resistant archival for retained object versions.
-- **Amazon Bedrock (configured model):** Consumes recorded evidence strictly post-hoc to generate human-readable forensics, blast-radius metrics, and advisory Cedar diffs. `BEDROCK_MODEL_ID` is required. **Bedrock has zero runtime authorization authority.**
+- **Amazon Bedrock (configured model):** Consumes a bounded recorded-evidence grounding envelope strictly post-hoc to generate human-readable forensic synthesis with references to immutable event IDs and hashes. `BEDROCK_MODEL_ID` is required. **Bedrock has zero runtime authorization authority.**
 
 ---
 
@@ -224,23 +224,58 @@ Aegis does not claim internal neural causality. It provides **Evidence-Backed Li
 When an operator triggers forensic investigation, Bedrock receives a bounded recorded evidence envelope:
 ```json
 {
-  "incident_id": "inc_devfix_blocked_env",
-  "timestamp": "2026-09-16T12:00:00Z",
-  "task_contract_digest": "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
-  "violation_step": {
-    "step_number": 5,
-    "action": "fs:read",
-    "resource": ".env",
-    "policy_matched": "policy_forbid_devfix_credentials_01",
-    "decision": "DENY"
+  "groundingEnvelopeVersion": "phase5.v1",
+  "target": {
+    "eventId": "evt_...",
+    "eventHash": "sha256...",
+    "previousHash": "sha256...",
+    "eventType": "AUTHORIZATION_EXECUTION",
+    "sessionId": {
+      "value": "sess_...",
+      "redacted": false
+    }
   },
-  "taint_trace": {
-    "source_step": 4,
-    "source_resource": "node_modules/axios/README.md",
-    "trust_level": "UNTRUSTED_EXTERNAL",
-    "extracted_entities": [".env", "backend credentials"]
+  "chainVerification": {
+    "status": "VERIFIED",
+    "scope": "global-ledger"
   },
-  "hash_chain_head": "0x4b7c8a...2e1f"
+  "bounds": {
+    "maxSessionEvents": 12,
+    "includedSessionEvents": 4,
+    "contextIncomplete": false
+  },
+  "sessionEvents": [
+    {
+      "eventId": "evt_...",
+      "eventHash": "sha256...",
+      "operation": {
+        "tool": "fs",
+        "actionId": "fs:read",
+        "resourceId": {
+          "value": ".env",
+          "redacted": false
+        },
+        "argumentsHash": "sha256...",
+        "argumentsRedacted": true
+      },
+      "authorization": {
+        "decision": "DENY"
+      },
+      "execution": {
+        "state": "NOT_EXECUTED",
+        "httpStatus": 403,
+        "bytesReturned": 0
+      },
+      "provenance": {
+        "trust": "UNTRUSTED_EXTERNAL",
+        "source": "redacted-source:..."
+      }
+    }
+  ],
+  "notAsserted": [
+    "Aegis does not prove internal model intent.",
+    "Aegis does not mathematically prove causality."
+  ]
 }
 ```
 
@@ -251,7 +286,7 @@ When an operator triggers forensic investigation, Bedrock receives a bounded rec
 1. **Truth 1: Aegis is not DevFix.** Aegis is the generalized platform; DevFix is merely the reference agent.
 2. **Truth 2: Aegis doesn't prove AI intent.** Aegis evaluates tool parameters against declared Task Contract scope. It detects actions that drift outside that declared boundary.
 3. **Truth 3: Aegis does not claim mathematical causality.** Aegis models Evidence-Backed Lineage via temporal sequence, context provenance, and monotonic taint tracking.
-4. **Truth 4: Bedrock has zero runtime authorization authority.** Runtime authorization decisions are deterministic for requests evaluated against the declared policy via Cedar. Bedrock is invoked post-hoc to summarize evidence and evaluate blast radius.
+4. **Truth 4: Bedrock has zero runtime authorization authority.** Runtime authorization decisions are deterministic for requests evaluated against the declared policy via Cedar. Bedrock is invoked post-hoc to generate a grounded forensic synthesis from recorded evidence.
 5. **Truth 5: Aegis enforces through architecture, not magic.** The target deployment requires sandbox boundaries (container network isolation, lack of ambient host credentials) to be inevitable. The current repository does not implement container isolation.
 
 ---
@@ -324,4 +359,4 @@ npm run dev
 
 1. **Host Sandbox Boundary:** Aegis PEP requires environment isolation (Docker/Firecracker microVM) to prevent direct bypass via raw socket system calls.
 2. **Entity Token Heuristics:** Taint tracking monitors structured tool arguments and token spans. Obfuscated or base64-encoded instructions require decoding middleware prior to parameter inspection.
-3. **Human Sign-Off Required:** Bedrock policy suggestions are advisory drafts; enterprise security policy updates require human approval before being applied to Verified Permissions.
+3. **Human Sign-Off Required:** Bedrock investigation output is advisory forensic synthesis for human review; enterprise security policy updates remain outside the current automated flow.
