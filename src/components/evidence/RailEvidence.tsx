@@ -21,6 +21,7 @@ export default function RailEvidence({ events, idx, selected, select }: any) {
             <div className="id">{e.id}</div>
             <div style={{ textAlign: "right", gridColumn: "2/4" }}><DecisionChip d={e.decision} /></div>
             <div className="h">{fmtT(e.t)} &middot; {e.tool}</div>
+            <div className="railmeta">{e.action} · {e.resource}</div>
           </button>
         ))}
       </div>
