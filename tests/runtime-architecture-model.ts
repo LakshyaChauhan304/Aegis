@@ -193,7 +193,8 @@ function testInspectorUsesOnlyEventData() {
 
 function testSecondPassVisualContract() {
   assert(RUNTIME_VISUAL_DETAIL.palette.machineShell === "off-white", "Machine shell should use a light premium material direction");
-  assert(RUNTIME_VISUAL_DETAIL.palette.stage === "dark-dashboard", "Scene should remain inside the dark dashboard stage");
+  assert(RUNTIME_VISUAL_DETAIL.palette.stage === "light-editorial-machine", "Scene should use the light editorial machine stage");
+  assert(RUNTIME_VISUAL_DETAIL.palette.technicalAccent === "orange", "Orange should be the primary technical accent");
 
   const cedar = RUNTIME_VISUAL_DETAIL.modules.cedar;
   assert(cedar.minimumParts > RUNTIME_VISUAL_DETAIL.modules.decision.minimumParts, "Cedar must be more detailed than the decision gate");

@@ -223,7 +223,7 @@ export default function SecurityTests() {
 
       {runLog.length > 0 && (
         <Panel title="LIVE SUITE EXECUTION LOG" flush style={{ marginBottom: "var(--s5)" }}>
-          <div style={{ padding: "var(--s4)", background: "rgba(0,0,0,0.4)", maxHeight: 200, overflowY: "auto" }}>
+          <div style={{ padding: "var(--s4)", background: "var(--panel-2)", maxHeight: 200, overflowY: "auto" }}>
             {runLog.map((line, i) => (
               <div key={i} className="mono" style={{ fontSize: 11, color: line.startsWith("✓") ? "var(--allow)" : line.startsWith("✗") ? "var(--deny)" : "var(--muted)", padding: "2px 0" }}>
                 {line}

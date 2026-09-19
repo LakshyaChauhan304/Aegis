@@ -10,14 +10,14 @@ export default function BoundaryVisual({ height = 400, event = null, compact = f
   const [hint, setHint] = useState("");
 
   const theme = {
-    bg: 0x101216,
-    grid: 0x22262C,
-    pep: 0x3A424B,
-    tool: 0x2D333B,
-    allow: 0x57A96C,
-    deny: 0xD25C5C,
-    amber: 0xC4922F,
-    fg: 0xE7E9EC,
+    bg: 0xfcffff,
+    grid: 0xd5d8c5,
+    pep: 0x0a0a0a,
+    tool: 0xdedfde,
+    allow: 0x3e8b5c,
+    deny: 0xe5562f,
+    amber: 0xf47920,
+    fg: 0xf47920,
   };
 
   useEffect(() => {
@@ -158,9 +158,9 @@ export default function BoundaryVisual({ height = 400, event = null, compact = f
     <div className="viz" style={{ height }}>
       <div ref={mountRef} style={{ width: "100%", height: "100%" }} />
       <div className="vizlegend">
-        <span><span className="sdot" style={{ background: "#3A424B" }} /> PEP GATEWAY</span>
-        <span><span className="sdot" style={{ background: "#2D333B" }} /> TOOL</span>
-        <span><span className="sdot" style={{ background: "#E7E9EC" }} /> REQUEST</span>
+        <span><span className="sdot" style={{ background: "#0A0A0A" }} /> PEP GATEWAY</span>
+        <span><span className="sdot" style={{ background: "#DEDFDE" }} /> TOOL</span>
+        <span><span className="sdot" style={{ background: "#F47920" }} /> REQUEST</span>
       </div>
       <div className="vizhint">{hint}</div>
       {event ? (

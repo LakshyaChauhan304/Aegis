@@ -94,11 +94,11 @@ export type RuntimeComponentExplanation = {
 
 export const RUNTIME_VISUAL_DETAIL = {
   palette: {
-    stage: "dark-dashboard",
+    stage: "light-editorial-machine",
     machineShell: "off-white",
     accentApproved: "green",
     accentRejected: "red-orange",
-    technicalAccent: "restrained-cyan",
+    technicalAccent: "orange",
   },
   modules: {
     cedar: {

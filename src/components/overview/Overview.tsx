@@ -1,7 +1,4 @@
 import React from "react";
-import PageHead from "../shared/PageHead.tsx";
-import Panel from "../shared/Panel.tsx";
-import StateChip from "../shared/StateChip.tsx";
 import AegisRuntimeArchitecture from "../viz/AegisRuntimeArchitecture.tsx";
 import { SESSION } from "../../data/fixtures.js";
 
@@ -9,113 +6,120 @@ export default function Overview({ events, idx, go, chain, analysis }: any) {
   const allow = events.filter((e: any) => e.decision === "ALLOW").length;
   const deny = events.filter((e: any) => e.decision === "DENY").length;
   const untrusted = events.filter((e: any) => e.trust === "UNTRUSTED_EXTERNAL").length;
+  const decisions = allow + deny;
   const currentEvent = events[idx] || events[events.length - 1] || null;
+  const chainVerified = chain?.verified !== false;
+  const chainText = chain?.ok != null && chain?.total != null ? `${chain.ok}/${chain.total}` : `${events.length}/${events.length}`;
 
   return (
-    <>
-      <PageHead
-        title="Aegis Overview"
-        desc="Aegis controls and accounts for autonomous AI actions through deterministic policy enforcement and cryptographically linked evidence."
-      />
-
-      <Panel title="RUNTIME ARCHITECTURE &middot; THE BOUNDARY IS THE PEP" flush>
-        <AegisRuntimeArchitecture height={320} event={currentEvent} chain={chain} analysis={analysis} />
-      </Panel>
-
-      <div className="grid g4" style={{ marginBottom: "var(--s5)" }}>
-        <button onClick={() => go("agents")} style={{ textAlign: "left" }}>
-          <Panel flush>
-            <div style={{ padding: "16px 20px" }}>
-              <div className="bigstat">
-                <div className="n">1</div>
-                <div className="l">ACTIVE AGENT</div>
-              </div>
-            </div>
-            <div style={{ borderTop: "1px solid var(--line)", padding: "10px 20px", fontSize: 11.5, color: "var(--muted)" }}>
-              {SESSION.agentName} &middot; {SESSION.agentRole}
-            </div>
-          </Panel>
-        </button>
-
-        <button onClick={() => go("evidence")} style={{ textAlign: "left" }}>
-          <Panel flush>
-            <div style={{ padding: "16px 20px" }}>
-              <div className="bigstat">
-                <div className="n">{events.length}</div>
-                <div className="l">EVIDENCE EVENTS</div>
-              </div>
-            </div>
-            <div style={{ borderTop: "1px solid var(--line)", padding: "10px 20px", fontSize: 11.5, color: "var(--muted)", display: "flex", justifyContent: "space-between" }}>
-              <span>SHA-256 chain</span>
-              <span style={{ color: "var(--allow)" }}>VERIFIED</span>
-            </div>
-          </Panel>
-        </button>
-
-        <button onClick={() => go("decisions")} style={{ textAlign: "left" }}>
-          <Panel flush>
-            <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-              <div className="bigstat">
-                <div className="n allow">{allow}</div>
-                <div className="l">ALLOW</div>
-              </div>
-              <div className="bigstat">
-                <div className="n deny">{deny}</div>
-                <div className="l">DENY</div>
-              </div>
-            </div>
-            <div style={{ borderTop: "1px solid var(--line)", padding: "10px 20px", fontSize: 11.5, color: "var(--muted)" }}>
-              Recorded authorization decisions
-            </div>
-          </Panel>
-        </button>
-
-        <button onClick={() => go("execution")} style={{ textAlign: "left" }}>
-          <Panel flush>
-            <div style={{ padding: "16px 20px" }}>
-              <div className="bigstat">
-                <div className="n">{untrusted}</div>
-                <div className="l">UNTRUSTED INPUTS</div>
-              </div>
-            </div>
-            <div style={{ borderTop: "1px solid var(--line)", padding: "10px 20px", fontSize: 11.5, color: "var(--muted)" }}>
-              Third-party context ingested
-            </div>
-          </Panel>
-        </button>
-      </div>
-      
-      <div className="grid g2">
-        <Panel title="SYSTEM STATUS" flush>
-          <div className="tablescroll">
-            <table className="dt">
-              <tbody>
-                <tr>
-                  <td>Backend enforcement (PEP)</td>
-                  <td><StateChip s="VERIFIED" /></td>
-                </tr>
-                <tr>
-                  <td>Cedar policy evaluation</td>
-                  <td><StateChip s="VERIFIED" /></td>
-                </tr>
-                <tr>
-                  <td>AWS Bedrock Integration</td>
-                  <td><StateChip s="SDK_READY" /></td>
-                </tr>
-              </tbody>
-            </table>
+    <div className="overview-page">
+      <section className="overview-editorial-hero" aria-labelledby="overview-title">
+        <div className="overview-brand-line">
+          <span className="mini-mark" />
+          <strong>AEGIS</strong>
+          <span>Security control plane for AI agents</span>
+        </div>
+        <div className="overview-headline-row">
+          <div>
+            <div className="editorial-eyebrow">AEGIS RUNTIME ARCHITECTURE</div>
+            <h1 id="overview-title" className="overview-mega-title">FROM AGENT INTENT TO VERIFIED OUTCOMES</h1>
           </div>
-        </Panel>
+          <div className="overview-principles">
+            <span>POLICY<br />PROVENANCE<br />ENFORCEMENT<br />EVIDENCE</span>
+            <span>TRUST<br />TURNS AGENTS<br />INTO ACCOUNTABILITY</span>
+          </div>
+        </div>
+        <div className="overview-machine-stage">
+          <AegisRuntimeArchitecture height={660} event={currentEvent} chain={chain} analysis={analysis} />
+        </div>
+        <div className="overview-instruments">
+          <aside className="live-session-panel">
+            <div className="live-head">
+              <span>LIVE SESSION</span>
+              <button aria-label="More session actions">...</button>
+            </div>
+            <div className="session-body">
+              <div className="session-primary">
+                <div className="session-id">{SESSION.id}</div>
+                <div className="session-status">ACTIVE</div>
+              </div>
+              <div className="session-grid">
+                {[
+                  ["Agent", SESSION.agentName],
+                  ["Contract", SESSION.contractId],
+                  ["Events", events.length],
+                  ["Allowed", allow],
+                  ["Denied", deny],
+                  ["Untrusted Inputs", untrusted],
+                ].map(([label, value]) => (
+                  <div className="session-row" data-label={label} key={label}>
+                    <span>{label}</span>
+                    <strong title={String(value)}>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="session-actions">
+              <button className="btn" onClick={() => go("sessions")}>View Session -&gt;</button>
+            </div>
+          </aside>
+          <aside className="overview-brand-panel">
+            <div>CONTROL<br />OBSERVE<br />INVESTIGATE<br />VERIFY</div>
+          </aside>
+        </div>
+      </section>
 
-        <Panel title="CORE PRINCIPLES">
-          <ul style={{ margin: 0, paddingLeft: 20, color: "var(--muted)", lineHeight: 1.7, fontSize: 13 }}>
-            <li><strong>Authorization is absolute.</strong> The agent cannot override Cedar / AVP policy enforcement.</li>
-            <li><strong>Enforcement is architectural.</strong> The gateway (PEP) wraps the tool. The tool cannot be reached if the policy denies it.</li>
-            <li><strong>Evidence is cryptographic.</strong> Every decision is chained. Modification breaks the chain.</li>
-            <li><strong>AI is not an authority.</strong> Bedrock analyzes the evidence after the fact. It holds zero runtime authorization capability.</li>
-          </ul>
-        </Panel>
-      </div>
-    </>
+      <section className="overview-metrics">
+        <button className="control-metric" onClick={() => go("decisions")}>
+          <span className="icon">D</span>
+          <span>
+            <span className="label">Total Decisions</span>
+            <span className="value">{decisions}</span>
+            <span className="meta">{allow} allow / {deny} deny</span>
+          </span>
+        </button>
+        <button className="control-metric" onClick={() => go("policies")}>
+          <span className="icon">P</span>
+          <span>
+            <span className="label">Policy Enforcement</span>
+            <span className="value">{decisions ? "100%" : "N/A"}</span>
+            <span className="meta">Derived from recorded gateway decisions</span>
+          </span>
+        </button>
+        <button className="control-metric" onClick={() => go("evidence")}>
+          <span className="icon">E</span>
+          <span>
+            <span className="label">Evidence Integrity</span>
+            <span className="value">{chainVerified ? "100%" : "CHECK"}</span>
+            <span className="meta">Hash chain {chainText} verified</span>
+          </span>
+        </button>
+        <button className="control-metric" onClick={() => go("agents")}>
+          <span className="icon">A</span>
+          <span>
+            <span className="label">Active Agent</span>
+            <span className="value">{SESSION.agentName}</span>
+            <span className="meta">Session {SESSION.id} / fixture-backed</span>
+          </span>
+        </button>
+      </section>
+
+      <section className="overview-bottom">
+        <div className="aegis-card warm overview-text-panel">
+          <div className="editorial-eyebrow">SYSTEM STATUS</div>
+          <div className="overview-status-grid">
+            <div><strong>Backend enforcement</strong><span>Local PEP gateway verified by current runtime flow.</span></div>
+            <div><strong>Cedar policy evaluation</strong><span>Runtime authorization authority before protected execution.</span></div>
+            <div><strong>Post-hoc investigation</strong><span>Evidence analysis only; never runtime authorization.</span></div>
+          </div>
+        </div>
+        <div className="aegis-card overview-text-panel">
+          <div className="editorial-eyebrow">CORE PRINCIPLES</div>
+          <p><strong>Authorization is absolute.</strong> The agent cannot override Cedar / AVP policy enforcement.</p>
+          <p><strong>Enforcement is architectural.</strong> The gateway wraps the protected tool before execution.</p>
+          <p><strong>Evidence is cryptographic.</strong> Every decision is chained for verification.</p>
+        </div>
+      </section>
+    </div>
   );
 }

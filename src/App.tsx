@@ -13,6 +13,7 @@ import LineageVisual from "./components/lineage/LineageVisual.tsx";
 import Investigations from "./components/investigations/Investigations.tsx";
 import SecurityTests from "./components/tests/SecurityTests.tsx";
 import AwsControlPlane from "./components/aws/AwsControlPlane.tsx";
+import Onboarding from "./components/onboarding/Onboarding.tsx";
 import aegisApi from "./data/aegisApi.ts";
 import { EVENTS } from "./data/fixtures.js";
 import { parseHash, ROUTE_IDS, ROUTE_LABELS } from "./components/layout/routes.ts";
@@ -82,6 +83,7 @@ export default function App() {
   }, []);
 
   const Component = {
+    onboarding: Onboarding,
     overview: Overview,
     agents: Agents,
     execution: Execution,
@@ -96,6 +98,10 @@ export default function App() {
     tests: SecurityTests,
     aws: AwsControlPlane,
   }[route as keyof typeof ROUTE_LABELS] || Overview;
+
+  if (route === "onboarding") {
+    return <Onboarding go={setRoute} />;
+  }
 
   return (
     <AppShell

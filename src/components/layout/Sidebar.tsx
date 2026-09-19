@@ -7,7 +7,7 @@ export default function Sidebar({ route, setRoute }: any) {
       <div className="brand">
         <div className="mark" aria-hidden="true" />
         <div className="name">AEGIS</div>
-        <div className="role">SECURE AGENT PLATFORM</div>
+        <div className="role">SECURITY FOR AI AGENTS</div>
       </div>
       
       <div className="navscroll">
@@ -28,8 +28,8 @@ export default function Sidebar({ route, setRoute }: any) {
       </div>
       
       <div className="sidefoot">
-        <div className="r"><span>UI HANDOFF</span><span>v1.0.0</span></div>
-        <div className="r"><span>AWS INTEGRATION</span><span style={{ color: "var(--info)" }}>SDK READY</span></div>
+        <div className="r"><span>A SAFER</span><span>AGENT FUTURE</span></div>
+        <div className="r"><span>AWS</span><span style={{ color: "var(--orange)" }}>SDK READY</span></div>
       </div>
     </nav>
   );

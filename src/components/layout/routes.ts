@@ -32,13 +32,18 @@ export const ROUTE_GROUPS = [
   },
 ];
 
-export const ROUTE_IDS = ROUTE_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+export const SPECIAL_ROUTE_IDS = ["onboarding"];
+
+export const ROUTE_IDS = [...SPECIAL_ROUTE_IDS, ...ROUTE_GROUPS.flatMap((g) => g.items.map((i) => i.id))];
 
 export const ROUTE_LABELS = Object.fromEntries(
-  ROUTE_GROUPS.flatMap((g) => g.items.map((i) => [i.id, i.label]))
+  [
+    ["onboarding", "AEGIS Onboarding"],
+    ...ROUTE_GROUPS.flatMap((g) => g.items.map((i) => [i.id, i.label])),
+  ]
 );
 
-export const DEFAULT_ROUTE = "overview";
+export const DEFAULT_ROUTE = "onboarding";
 
 export const RAILED_ROUTES = new Set(["execution", "evidence", "lineage", "decisions", "recorder"]);
 

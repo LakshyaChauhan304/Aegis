@@ -5,7 +5,7 @@ export default function TopNav() {
   return (
     <div className="authbar">
       <div className="authcell">
-        <div className="k">REFERENCE SESSION</div>
+        <div className="k">LIVE DEMO SESSION</div>
         <div className="v">{SESSION.id}</div>
       </div>
       <div className="authcell">
@@ -13,7 +13,7 @@ export default function TopNav() {
         <div className="v sans">{SESSION.agentName}</div>
       </div>
       <div className="authcell">
-        <div className="k">DEMO CONTRACT</div>
+        <div className="k">TASK CONTRACT</div>
         <div className="v">{CONTRACT.id}</div>
       </div>
       <div className="authcell">
