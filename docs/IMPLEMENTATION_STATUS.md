@@ -19,10 +19,12 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 | Bedrock grounding envelope | IMPLEMENTED | VERIFIED BY TEST | `/api/agent/investigate/:eventId` builds a bounded allowlisted session envelope with event IDs, hashes, verification status, authorization/execution metadata, and safe provenance metadata |
 | Structured investigation result | IMPLEMENTED | VERIFIED BY TEST | Bedrock output is parsed as structured JSON with evidence references validated against supplied event IDs/hashes; invalid references are marked unverified |
 | Backend API trust boundary | IMPLEMENTED | VERIFIED BY TEST | `AEGIS_API_TOKEN` bearer authentication protects agent invoke, ledger, reconstruction, investigation, and policy-source routes before normalization or execution |
+| ECS/Fargate deployment readiness | IMPLEMENTED | LOCAL PRODUCTION-STYLE TEST | Docker packaging and `deploy/ecs-fargate-alb.yaml` package the current Express backend for a single-task ECS/Fargate + ALB proof; no live ECS deployment is claimed here |
 | Argument execution | NOT IMPLEMENTED | VERIFIED UNAVAILABLE | Arguments are represented by presence/redaction/hash metadata; unexpected current `fs:read` arguments fail closed |
 | Signed/KMS Task Contract verification | NOT IMPLEMENTED | NOT APPLICABLE | No cryptographic signature, HMAC, or KMS verification is implemented |
 | KMS-backed signing | NOT IMPLEMENTED | NOT APPLICABLE | KMS is not used by runtime code |
-| API Gateway/Lambda | NOT IMPLEMENTED | NOT LIVE | Current backend is local Express |
+| API Gateway/Lambda | NOT IMPLEMENTED | NOT LIVE | Current backend is Express packaged for local/container execution; API Gateway and Lambda are not implemented |
+| ECS/Fargate + ALB | IMPLEMENTED ARTIFACT | NOT LIVE VERIFIED | Phase 8 deployment artifact uses desired count `1` because the ledger is process-local; task restart resets local reconstruction state |
 
 ## Phase 4A AWS Resources
 
@@ -46,4 +48,7 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 - API bearer authentication is an access boundary for protected backend routes. It does not cryptographically authenticate the agent, bind model identity, or replace Task Contract/Cedar authorization.
 - `AEGIS_API_TOKEN` is an API access-control boundary for the local/demo deployment. It is not cryptographic authentication of an AI agent, and a token exposed to a browser client must not be treated as confidential. When supplied to a browser client through Vite environment configuration as `VITE_AEGIS_API_TOKEN`, the token is necessarily observable by that client and therefore is not a confidential credential or cryptographic agent identity.
 - `/api/health`, `/api/aegis/status`, and `/api/aegis/capabilities` remain public truth/status endpoints; `/api/aegis/policy` and `/api/agent/*` are protected.
+- Phase 8 packages the current Aegis Express backend as a single-task ECS/Fargate deployment artifact behind an ALB. This is not a live deployment claim unless an ALB endpoint is separately verified.
+- The Phase 8 executor operates on repository artifacts packaged into the Aegis container. This deployment does not claim general sandbox or host-filesystem isolation.
+- The ledger remains process-local. One ECS task is used for Phase 8 proof; task restart resets local ledger state, and reconstruction does not replay from DynamoDB/S3.
 - No credentials, access keys, session tokens, or passwords are committed.

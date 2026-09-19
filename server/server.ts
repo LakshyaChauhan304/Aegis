@@ -69,7 +69,8 @@ function requireAegisApiAccess(req: express.Request, res: express.Response, next
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const configuredPort = Number(process.env.PORT || 3000);
+  const PORT = Number.isFinite(configuredPort) && configuredPort > 0 ? configuredPort : 3000;
 
   app.use(express.json());
 
@@ -256,9 +257,20 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Aegis Gateway running on http://0.0.0.0:${PORT}`);
   });
+
+  function shutdown(signal: NodeJS.Signals) {
+    console.log(`[AEGIS] ${signal} received; closing HTTP server.`);
+    server.close(() => {
+      console.log("[AEGIS] HTTP server closed.");
+      process.exit(0);
+    });
+  }
+
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
 }
 
 startServer();

@@ -3,7 +3,7 @@
 > **"Aegis controls and accounts for autonomous AI actions."**
 >
 > Built for the **AWS Bharat Build Tour Hackathon** (Ship It Track).  
-> **AWS-native target architecture:** **Amazon Verified Permissions (Cedar)**, **AWS Lambda**, **Amazon EventBridge**, **Amazon DynamoDB**, **Amazon S3 (Object Lock Compliance Mode)**, and **Amazon Bedrock (configured model)** define the production control-plane topology. The current repository uses a local Express PEP; Lambda and API Gateway are not implemented here.
+> **AWS-native target architecture:** **Amazon Verified Permissions (Cedar)**, **AWS Lambda**, **Amazon EventBridge**, **Amazon DynamoDB**, **Amazon S3 (Object Lock Compliance Mode)**, and **Amazon Bedrock (configured model)** define the production control-plane topology. The current repository packages the existing Express PEP as a container-ready backend; Lambda and API Gateway are not implemented here.
 > 
 > *Note on implementation:* The interactive repository dashboard demonstrates the current filesystem-backed Aegis control flow and in-process Cedar evaluation locally. Historical latency numbers in this README are project test-environment measurements, not universal production guarantees.
 
@@ -13,7 +13,7 @@
 Minimum AWS resources have been provisioned in `ap-southeast-2` for the current implementation: Amazon Verified Permissions policy store `4VKzAMGEYyBg3ZkcpULube`, DynamoDB table `AegisEvidence`, S3 bucket `aegis-evidence-643220021031-ap-southeast-2` with Object Lock enabled, and the default EventBridge event bus.
 
 Current implementation boundaries:
-- The backend is a local Express PEP, not live API Gateway or Lambda.
+- The backend is an Express PEP. Phase 8 adds Docker packaging and a single-task ECS/Fargate + ALB deployment artifact for proof, but this repository does not claim a live deployed service unless an ALB endpoint is actually verified.
 - Runtime authorization is local Cedar plus optional AVP comparison; if AVP differs from local Cedar, Aegis fails closed.
 - Evidence is a process-local SHA-256 linear hash chain. Primary authorization/execution events include contract metadata, normalized operation metadata, authorization outcome, execution outcome, byte count, HTTP status, and executor identity. AWS archival outcomes are recorded as separate archival receipt events that reference the immutable primary event hash. DynamoDB and S3 are post-execution archival sinks, not replay storage for the current UI.
 - EventBridge is currently a publisher only; no EventBridge consumer or event-driven archival pipeline is implemented.
@@ -22,6 +22,7 @@ Current implementation boundaries:
 - `AEGIS_API_TOKEN` is an API access-control boundary for the local/demo deployment. It is not cryptographic authentication of an AI agent, and a token exposed to a browser client must not be treated as confidential. When supplied to a browser client through Vite environment configuration as `VITE_AEGIS_API_TOKEN`, the token is necessarily observable by that client and therefore is not a confidential credential or cryptographic agent identity.
 - Trusted local Task Contract enforcement is implemented through a backend registry resolved by `contractId`. The backend normalizes tool/action/resource/argument metadata before Cedar/AVP authorization and records the normalized operation identity in evidence. KMS, cryptographic signed Task Contract verification, HMAC/session tokens, shell execution, network enforcement, container isolation, API Gateway, and Lambda are not implemented in this repository.
 - Protected execution is dispatched through a static backend executor registry after authorization. The only registered executor is `fs:fs:read`; npm, git, shell, network, and MCP execution remain unimplemented. Session reconstruction is exposed through a bounded backend endpoint that returns ordered ledger events for a session and the current global hash-chain verification result.
+- Phase 8 executor behavior is limited to repository artifacts packaged into the Aegis container. This deployment does not claim general sandbox or host-filesystem isolation. The Phase 8 ECS proof uses desired count `1` because the ledger is process-local; task restart resets local reconstruction state, and DynamoDB/S3 are archival sinks, not replay sources.
 
 ---
 
@@ -75,7 +76,7 @@ Existing security systems fail to solve this:
                        ┌─────────────────────────────┐
                        │      Aegis PEP Proxy        │
                        │   [Local Demonstration]     │
-                       │ (Prod: API Gateway + Lambda)│
+                       │ (Phase 8: ECS/Fargate + ALB)│
                        └──────────────┬──────────────┘
                                       │
                ┌──────────────────────┴──────────────────────┐
@@ -115,7 +116,7 @@ Existing security systems fail to solve this:
 
 ### Why AWS Native Services? (Ship It Production Grade)
 - **Amazon Verified Permissions (Cedar):** Provides the optional remote authorization comparison path. Local Cedar remains the reference/fallback authority, and mismatch with AVP fails closed.
-- **AWS Lambda:** Production topology target; not implemented in the current repository.
+- **AWS Lambda:** Production topology target; not implemented in the current repository. Phase 8 uses a container-ready Express backend artifact for ECS/Fargate proof instead.
 - **Amazon EventBridge:** Current implementation is a publisher only using `events:PutEvents`; no EventBridge consumer pipeline is implemented.
 - **Amazon DynamoDB:** Current implementation performs direct post-execution evidence archival with `dynamodb:PutItem`; it is not the current UI replay source.
 - **Amazon S3 (Object Lock Compliance Mode):** Current implementation writes evidence objects with Object Lock retention headers to support tamper-resistant archival for retained object versions.
@@ -354,6 +355,19 @@ npm run build
 npm run dev
 # Open http://localhost:3000 to interact with the DevFix hero demo
 ```
+
+### Phase 8 Container Readiness
+
+```bash
+docker build -t aegis:phase8 .
+docker run --rm -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e AEGIS_API_TOKEN=phase8-local-demo-token \
+  -e AWS_EC2_METADATA_DISABLED=true \
+  aegis:phase8
+```
+
+`deploy/ecs-fargate-alb.yaml` defines the minimal ECS/Fargate + ALB deployment artifact for the current Express backend. It uses a single desired task for proof because the ledger is process-local. `AEGIS_API_TOKEN` must be supplied at runtime, preferably through Secrets Manager injection; no AWS access keys or real API tokens are baked into the image.
 
 ---
 
