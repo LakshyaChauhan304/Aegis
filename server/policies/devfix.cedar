@@ -63,3 +63,20 @@ when {
     context.resourceId == "node_modules/axios/README.md" &&
     context.argumentsPresent == false
 };
+
+// 6. Permit a controlled missing-file fixture for execution-failure evidence
+permit (
+    principal == Aegis::Agent::"DevFix",
+    action == Aegis::Action::"fs:read",
+    resource == Aegis::File::"tests/fixtures/missing-allowed.txt"
+)
+when {
+    context.contractValid == true &&
+    context.contractId == "tc_devfix_dependency_remediation_v1" &&
+    context.contractVersion == "1" &&
+    context.tool == "fs" &&
+    context.normalizedAction == "read" &&
+    context.resourceType == "file" &&
+    context.resourceId == "tests/fixtures/missing-allowed.txt" &&
+    context.argumentsPresent == false
+};

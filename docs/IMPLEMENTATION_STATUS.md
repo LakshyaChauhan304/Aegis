@@ -9,7 +9,8 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 | Tool call interface | IMPLEMENTED | VERIFIED | `/api/agent/invoke` |
 | Local Cedar evaluation | IMPLEMENTED | VERIFIED | `server/policies/devfix.cedar` |
 | .env protection | IMPLEMENTED | VERIFIED | DENY returns HTTP 403 before file read |
-| Evidence ledger | IMPLEMENTED | VERIFIED | Process-local SHA-256 linear hash chain; contract and normalized operation metadata participate in event hashes |
+| Evidence ledger | IMPLEMENTED | VERIFIED | Process-local SHA-256 linear hash chain; immutable primary events record contract, normalized operation, authorization, execution, byte count, HTTP status, and executor identity; archival outcomes are separate receipt events linked to primary event hashes |
+| Session reconstruction | IMPLEMENTED | VERIFIED BY TEST | `/api/agent/sessions/:sessionId/reconstruct` returns ordered session events and global ledger verification result |
 | Shell execution | NOT IMPLEMENTED | VERIFIED UNAVAILABLE | Unsupported action returns no execution result |
 | Network enforcement | NOT IMPLEMENTED | NOT APPLICABLE | No network tool exists |
 | Trusted local Task Contract enforcement | IMPLEMENTED | VERIFIED BY TEST | `contractId` resolves against backend registry before Cedar/AVP authorization |
@@ -24,10 +25,10 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 
 | Service | Repository path | Resource state | App path state | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
-| Amazon Verified Permissions | `server/pep.ts` | CREATED | LIVE_VERIFIED with `AWS_PROFILE=aegis` | Policy store `4VKzAMGEYyBg3ZkcpULube`; direct AWS MCP `IsAuthorized` returned package.json ALLOW and .env DENY |
-| EventBridge default bus | `server/aws-archiver.ts` | AVAILABLE | LIVE_VERIFIED with `AWS_PROFILE=aegis` | AWS MCP `PutEvents` succeeded on `default`, event ID `bf726887-57d2-36af-6468-b11ed2ed2cb3` |
-| DynamoDB | `server/aws-archiver.ts` | CREATED | LIVE_VERIFIED with `AWS_PROFILE=aegis` | Table `AegisEvidence`; AWS MCP read-back matched event ID/hash/decision |
-| S3 Object Lock | `server/aws-archiver.ts` | CREATED | LIVE_VERIFIED with `AWS_PROFILE=aegis` | Bucket `aegis-evidence-643220021031-ap-southeast-2`; object version and COMPLIANCE retention observed |
+| Amazon Verified Permissions | `server/pep.ts` | CREATED | HISTORICALLY LIVE-VERIFIED; CURRENT RUN DEGRADED WITHOUT CREDENTIALS | Historical check with `AWS_PROFILE=aegis`: policy store `4VKzAMGEYyBg3ZkcpULube`; direct AWS MCP `IsAuthorized` returned package.json ALLOW and .env DENY |
+| EventBridge default bus | `server/aws-archiver.ts` | AVAILABLE | HISTORICALLY LIVE-VERIFIED; CURRENT RUN DEGRADED WITHOUT CREDENTIALS | Historical check with `AWS_PROFILE=aegis`: AWS MCP `PutEvents` succeeded on `default`, event ID `bf726887-57d2-36af-6468-b11ed2ed2cb3` |
+| DynamoDB | `server/aws-archiver.ts` | CREATED | HISTORICALLY LIVE-VERIFIED; CURRENT RUN DEGRADED WITHOUT CREDENTIALS | Historical check with `AWS_PROFILE=aegis`: table `AegisEvidence`; AWS MCP read-back matched event ID/hash/decision |
+| S3 Object Lock | `server/aws-archiver.ts` | CREATED | HISTORICALLY LIVE-VERIFIED; CURRENT RUN DEGRADED WITHOUT CREDENTIALS | Historical check with `AWS_PROFILE=aegis`: bucket `aegis-evidence-643220021031-ap-southeast-2`; object version and COMPLIANCE retention observed |
 | Amazon Bedrock | `server/bedrock-investigator.ts` | ACTIVE PROFILES INSPECTED | CONFIGURABLE, blocked by account model-access/use-case requirement | `BEDROCK_MODEL_ID` is required for invocation; no hardcoded model fallback remains |
 
 ## Important Boundaries
@@ -35,6 +36,7 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 - Evidence is a SHA-256 linear hash chain, not a Merkle tree.
 - EventBridge is a publisher only in the current implementation; no consumer or event-driven archival pipeline is implemented.
 - DynamoDB and S3 archival are direct post-execution SDK writes in `server/aws-archiver.ts`.
+- AWS archival outcomes are summarized in separate local receipt events as `ARCHIVAL_SUCCESS`, `ARCHIVAL_PARTIAL`, or `ARCHIVAL_FAILED`; live archival still requires valid AWS credentials and configured resources.
 - Bedrock is post-hoc only and never participates in ALLOW/DENY decisions.
 - Local Cedar remains the fallback/reference policy; AVP mismatch fails closed.
 - No credentials, access keys, session tokens, or passwords are committed.

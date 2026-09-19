@@ -127,7 +127,7 @@ async function main() {
   const ledger = ledgerResponse.data;
   verifyLedger(ledger);
 
-  const contractEvents = ledger.filter((event: any) => event.sessionId === runSessionId);
+  const contractEvents = ledger.filter((event: any) => event.sessionId === runSessionId && event.eventType === "AUTHORIZATION_EXECUTION");
   if (contractEvents.length < 9) {
     throw new Error(`Expected recorded contract events, got ${contractEvents.length}`);
   }

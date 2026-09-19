@@ -15,11 +15,11 @@ Minimum AWS resources have been provisioned in `ap-southeast-2` for the current 
 Current implementation boundaries:
 - The backend is a local Express PEP, not live API Gateway or Lambda.
 - Runtime authorization is local Cedar plus optional AVP comparison; if AVP differs from local Cedar, Aegis fails closed.
-- Evidence is a process-local SHA-256 linear hash chain. Contract metadata is recorded in the event and participates in the event hash. DynamoDB and S3 are post-execution archival sinks, not replay storage for the current UI.
+- Evidence is a process-local SHA-256 linear hash chain. Primary authorization/execution events include contract metadata, normalized operation metadata, authorization outcome, execution outcome, byte count, HTTP status, and executor identity. AWS archival outcomes are recorded as separate archival receipt events that reference the immutable primary event hash. DynamoDB and S3 are post-execution archival sinks, not replay storage for the current UI.
 - EventBridge is currently a publisher only; no EventBridge consumer or event-driven archival pipeline is implemented.
 - Bedrock is post-hoc only. `BEDROCK_MODEL_ID` is required to select the model/inference profile; no hardcoded model fallback is used. Live invocation currently requires account-level Bedrock model access/use-case approval.
 - Trusted local Task Contract enforcement is implemented through a backend registry resolved by `contractId`. The backend normalizes tool/action/resource/argument metadata before Cedar/AVP authorization and records the normalized operation identity in evidence. KMS, cryptographic signed Task Contract verification, HMAC/session tokens, shell execution, network enforcement, container isolation, API Gateway, and Lambda are not implemented in this repository.
-- Protected execution is dispatched through a static backend executor registry after authorization. The only registered executor is `fs:fs:read`; npm, git, shell, network, and MCP execution remain unimplemented.
+- Protected execution is dispatched through a static backend executor registry after authorization. The only registered executor is `fs:fs:read`; npm, git, shell, network, and MCP execution remain unimplemented. Session reconstruction is exposed through a bounded backend endpoint that returns ordered ledger events for a session and the current global hash-chain verification result.
 
 ---
 
@@ -56,7 +56,7 @@ Existing security systems fail to solve this:
    - **0 bytes leaked. File descriptor never created.**
 7. **The Post-Hoc Triad:**
    - Click **[WHY?]** $\rightarrow$ Renders Evidence-Backed Lineage DAG connecting Task $\rightarrow$ Injected README $\rightarrow$ `.env` request $\rightarrow$ Policy DENY.
-   - Click **[REPLAY]** $\rightarrow$ Scrubs state timeline tick-by-tick with tamper-evident SHA-256 linear hash-chain verification.
+   - Click **[REPLAY]** $\rightarrow$ Scrubs the recorded authorization/execution timeline with tamper-evident SHA-256 linear hash-chain verification.
    - Click **[INVESTIGATE]** $\rightarrow$ Amazon Bedrock (configured model) processes the recorded evidence envelope to summarize blast radius and propose refined Cedar policies for human sign-off.
 
 ---

@@ -1,13 +1,49 @@
 import express from "express";
 import path from "path";
-import { authorize, ToolRequest, Decision } from "./pep.js";
-import { globalLedger } from "./ledger.js";
+import { appendArchivalReceiptEvent, appendEvidenceEvent, evaluateAuthorization, ToolRequest, Decision } from "./pep.js";
+import { ArchivalEvidence, globalLedger } from "./ledger.js";
 import { createServer as createViteServer } from "vite";
 import { archiveToAWS, ArchivalResults } from "./aws-archiver.js";
 import { analyzeEvidence } from "./bedrock-investigator.js";
 import { getAegisStatus, getCapabilities, getPolicyInfo } from "./status.js";
 import { normalizeToolRequest } from "./task-contracts.js";
-import { getExecutor, ExecutionResult } from "./tool-executors.js";
+import { executorKey, getExecutor, ExecutionResult } from "./tool-executors.js";
+
+function archivalEvidenceFromResults(results: ArchivalResults): ArchivalEvidence {
+  const statuses = [results.eventBridge.status, results.dynamoDb.status, results.s3.status];
+  const successCount = statuses.filter((status) => status === "success").length;
+  const status = successCount === 3
+    ? "ARCHIVAL_SUCCESS"
+    : successCount === 0
+      ? "ARCHIVAL_FAILED"
+      : "ARCHIVAL_PARTIAL";
+
+  return {
+    status,
+    sinks: {
+      eventBridge: results.eventBridge.status,
+      dynamoDb: results.dynamoDb.status,
+      s3: results.s3.status,
+    },
+    eventBridgeEventId: results.eventBridge.eventId,
+    failures: {
+      ...(results.eventBridge.error ? { eventBridge: results.eventBridge.error } : {}),
+      ...(results.dynamoDb.error ? { dynamoDb: results.dynamoDb.error } : {}),
+      ...(results.s3.error ? { s3: results.s3.error } : {}),
+    },
+  };
+}
+
+function safeExecutionReason(result: ExecutionResult, fallback: string) {
+  if (result.executionState === "EXECUTED") return undefined;
+  if (result.error === "Unsupported arguments") return "UNSUPPORTED_ARGUMENTS";
+  if (result.error === "Path traversal not allowed") return "PATH_TRAVERSAL_NOT_ALLOWED";
+  if (result.error === "File not found") return "FILE_NOT_FOUND";
+  if (result.error === "Unsupported tool/action") return "UNSUPPORTED_TOOL_ACTION";
+  if (result.error === "Forbidden") return "AUTHORIZATION_DENIED";
+  if (result.error === "Execution failed") return "EXECUTION_FAILED";
+  return fallback;
+}
 
 async function startServer() {
   const app = express();
@@ -43,6 +79,34 @@ async function startServer() {
       res.json({ valid: isValid });
     } catch (err: any) {
       res.status(400).json({ valid: false, error: err.message });
+    }
+  });
+
+  app.get("/api/agent/sessions/:sessionId/reconstruct", (req, res) => {
+    const sessionId = req.params.sessionId;
+    const events = globalLedger.getSessionEvents(sessionId);
+    try {
+      const valid = globalLedger.verifyChain();
+      res.json({
+        sessionId,
+        events,
+        verification: {
+          valid,
+          scope: "global-ledger",
+          eventCount: events.length,
+        },
+      });
+    } catch (err: any) {
+      res.status(400).json({
+        sessionId,
+        events,
+        verification: {
+          valid: false,
+          scope: "global-ledger",
+          eventCount: events.length,
+          error: err.message,
+        },
+      });
     }
   });
 
@@ -82,12 +146,13 @@ async function startServer() {
 
     const normalizedRequest = normalizeToolRequest(request);
 
-    // 1. Evaluate authorization (Decision is FIXED and ledger is appended inside)
-    const decision: Decision = await authorize(normalizedRequest);
+    // 1. Evaluate authorization. Evidence is appended after execution outcome is known.
+    const evaluation = await evaluateAuthorization(normalizedRequest);
     
     // 2. Enforce decision and Execute real tool operation ONLY IF ALLOWED
     let executionResult: ExecutionResult;
-    if (decision.decision === "DENY") {
+    let executedBy: string | undefined = undefined;
+    if (evaluation.decision === "DENY") {
       console.log(`[AEGIS PEP] DENIED: ${normalizedRequest.operation.actionId} on ${normalizedRequest.operation.resource.id}`);
       executionResult = {
         statusCode: 403,
@@ -106,19 +171,38 @@ async function startServer() {
           bytesReturned: 0,
         };
       } else {
+        executedBy = executorKey(executor.tool, executor.actionId);
         executionResult = await executor.execute(normalizedRequest);
       }
     }
 
-    // 3. Dispatch out-of-band telemetry (AWS) AFTER execution
-    const event = globalLedger.getEvents().find(e => e.eventId === decision.eventId);
+    // 3. Record hash-covered evidence of both authorization and execution.
+    const event = appendEvidenceEvent(evaluation, {
+      state: executionResult.executionState,
+      statusCode: executionResult.statusCode,
+      bytesReturned: executionResult.bytesReturned,
+      executorKey: executedBy,
+      reason: safeExecutionReason(executionResult, "NOT_EXECUTED"),
+    });
+
+    const decision: Decision = {
+      decision: evaluation.decision,
+      reason: evaluation.reason,
+      eventId: event.eventId,
+      hash: event.hash,
+      contractValidation: evaluation.contractValidation,
+    };
+
+    // 4. Dispatch out-of-band telemetry (AWS) for the immutable primary event.
+    // The result is recorded as a separate receipt event to avoid mutating history.
     let archivalStatus: ArchivalResults | undefined = undefined;
     if (event) {
       archivalStatus = await archiveToAWS(event).catch(err => ({
-        eventBridge: { status: "failed" as const, error: err.message },
-        dynamoDb: { status: "failed" as const, error: err.message },
-        s3: { status: "failed" as const, error: err.message },
+        eventBridge: { status: "failed" as const, error: "AWS_ARCHIVAL_UNAVAILABLE" },
+        dynamoDb: { status: "failed" as const, error: "AWS_ARCHIVAL_UNAVAILABLE" },
+        s3: { status: "failed" as const, error: "AWS_ARCHIVAL_UNAVAILABLE" },
       }));
+      appendArchivalReceiptEvent(event, archivalEvidenceFromResults(archivalStatus));
     }
 
     // Return final integrated response payload

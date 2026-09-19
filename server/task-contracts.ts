@@ -72,6 +72,8 @@ export type NormalizedAuthorizationRequest = {
   context: {
     trust: string;
     source: string;
+    sourceHash: string;
+    sourceRedacted: boolean;
   };
 };
 
@@ -114,6 +116,7 @@ const devfixContractDefinition: ContractDefinition = {
       "sess_truth_",
       "sess_contract_",
       "sess_phase3_",
+      "sess_phase4_",
     ],
   },
   purpose: "dependency remediation",
@@ -122,6 +125,7 @@ const devfixContractDefinition: ContractDefinition = {
       { tool: "fs", action: "fs:read", resource: "package.json", trust: ["TRUSTED"] },
       { tool: "fs", action: "fs:read", resource: "package-lock.json", trust: ["TRUSTED"] },
       { tool: "fs", action: "fs:read", resource: "node_modules/axios/README.md", trust: ["UNTRUSTED_EXTERNAL"] },
+      { tool: "fs", action: "fs:read", resource: "tests/fixtures/missing-allowed.txt", trust: ["TRUSTED"] },
     ],
     deniedResources: [".env"],
   },
@@ -143,6 +147,10 @@ function canonicalJson(value: unknown): string {
 
 function hashCanonical(value: unknown): string {
   return crypto.createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+function hashString(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 function canonicalContract(definition: ContractDefinition): string {
@@ -229,10 +237,24 @@ function normalizeFileResource(rawResource: string): NormalizedAuthorizationRequ
   };
 }
 
+function normalizeSource(rawSource: string | undefined): NormalizedAuthorizationRequest["context"] {
+  const source = typeof rawSource === "string" && rawSource.trim() ? rawSource.trim() : "unknown";
+  const sourceHash = hashString(source);
+  const isSafeIdentifier = /^[A-Za-z0-9._:/@-]{1,120}$/.test(source);
+  const looksSecretLike = /(secret|token|password|credential|api[_-]?key|access[_-]?key)/i.test(source);
+  return {
+    trust: "",
+    source: isSafeIdentifier && !looksSecretLike ? source : `redacted-source:${sourceHash.slice(0, 16)}`,
+    sourceHash,
+    sourceRedacted: !isSafeIdentifier || looksSecretLike,
+  };
+}
+
 export function normalizeToolRequest(request: ToolRequest): NormalizedAuthorizationRequest {
   const argumentsPresent = Object.prototype.hasOwnProperty.call(request, "arguments");
   const argumentValue = argumentsPresent ? request.arguments : [];
   const argumentHash = hashCanonical(argumentValue);
+  const sourceContext = normalizeSource(request.context.source);
 
   return {
     principal: {
@@ -258,7 +280,9 @@ export function normalizeToolRequest(request: ToolRequest): NormalizedAuthorizat
     },
     context: {
       trust: request.context.trust,
-      source: request.context.source || "unknown",
+      source: sourceContext.source,
+      sourceHash: sourceContext.sourceHash,
+      sourceRedacted: sourceContext.sourceRedacted,
     },
   };
 }

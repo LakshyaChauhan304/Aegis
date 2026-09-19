@@ -3,7 +3,7 @@ import path from "path";
 import "dotenv/config";
 import * as cedar from "@cedar-policy/cedar-wasm";
 import { VerifiedPermissionsClient, IsAuthorizedCommand } from "@aws-sdk/client-verifiedpermissions";
-import { globalLedger } from "./ledger.js";
+import { ArchivalEvidence, EvidenceEvent, ExecutionEvidence, globalLedger } from "./ledger.js";
 import { ArchivalResults } from "./aws-archiver.js";
 import { ContractValidation, NormalizedAuthorizationRequest, ToolRequest, normalizeToolRequest, validateTaskContract } from "./task-contracts.js";
 
@@ -20,6 +20,19 @@ export type Decision = {
   eventId: string;
   hash: string;
   archivalStatus?: ArchivalResults;
+  contractValidation: ContractValidation;
+};
+
+export type AuthorizationEvaluation = {
+  request: NormalizedAuthorizationRequest;
+  decision: "ALLOW" | "DENY";
+  reason: string;
+  policyStoreId?: string;
+  authorization: {
+    provider: string;
+    policyStoreId?: string;
+    error?: string;
+  };
   contractValidation: ContractValidation;
 };
 
@@ -160,7 +173,18 @@ async function evaluateAVP(request: NormalizedAuthorizationRequest, contractVali
   return { decision: decision as "ALLOW" | "DENY", reason, policyStoreId };
 }
 
-export async function authorize(rawRequest: NormalizedAuthorizationRequest | ToolRequest): Promise<Decision> {
+function safeProviderError(err: any): string {
+  const message = String(err?.message || err || "authorization provider unavailable");
+  if (message.includes("timed out")) return message;
+  if (message.includes("credentials")) return "AWS_CREDENTIALS_UNAVAILABLE";
+  if (message.includes("Could not load credentials")) return "AWS_CREDENTIALS_UNAVAILABLE";
+  if (message.includes("UnrecognizedClient") || message.includes("InvalidSignature")) return "AWS_AUTHENTICATION_FAILED";
+  if (message.includes("AccessDenied")) return "AWS_ACCESS_DENIED";
+  if (message.includes("UNCONFIGURED_STORE_ID")) return "AVP_POLICY_STORE_UNCONFIGURED";
+  return "AVP_UNAVAILABLE";
+}
+
+export async function evaluateAuthorization(rawRequest: NormalizedAuthorizationRequest | ToolRequest): Promise<AuthorizationEvaluation> {
   const request = isNormalizedRequest(rawRequest) ? rawRequest : normalizeToolRequest(rawRequest);
   const contractValidation = validateTaskContract(request);
 
@@ -196,11 +220,30 @@ export async function authorize(rawRequest: NormalizedAuthorizationRequest | Too
     finalDecision = localResult.decision as "ALLOW" | "DENY";
     finalReason = localResult.reason;
     provider = "local-cedar";
-    avpError = err.message;
+    avpError = safeProviderError(err);
   }
 
-  // 4. Record Evidence locally
+  return {
+    request,
+    decision: finalDecision,
+    reason: finalReason,
+    policyStoreId,
+    authorization: {
+      provider,
+      policyStoreId,
+      error: avpError || undefined
+    },
+    contractValidation,
+  };
+}
+
+export function appendEvidenceEvent(
+  evaluation: AuthorizationEvaluation,
+  execution: ExecutionEvidence
+) {
+  const { request, contractValidation } = evaluation;
   const event = globalLedger.appendEvent({
+    eventType: "AUTHORIZATION_EXECUTION",
     sessionId: request.session.sessionId || "unknown-session",
     agentId: request.principal.agentId || "unknown-agent",
     contractId: contractValidation.contractId || request.contract.contractId || "unknown-contract",
@@ -221,20 +264,44 @@ export async function authorize(rawRequest: NormalizedAuthorizationRequest | Too
     action: request.operation.actionId,
     resource: request.operation.resource.id,
     context: request.context,
-    decision: finalDecision,
-    reason: finalReason,
-    authorization: {
-       provider,
-       policyStoreId,
-       error: avpError || undefined
-    }
+    decision: evaluation.decision,
+    reason: evaluation.reason,
+    authorization: evaluation.authorization,
+    executionState: execution.state,
+    httpStatus: execution.statusCode,
+    bytesReturned: execution.bytesReturned,
+    executorKey: execution.executorKey,
+    execution,
+  });
+
+  return event;
+}
+
+export function appendArchivalReceiptEvent(originalEvent: EvidenceEvent, archival: ArchivalEvidence) {
+  return globalLedger.appendEvent({
+    eventType: "ARCHIVAL_RECEIPT",
+    sessionId: originalEvent.sessionId,
+    agentId: originalEvent.agentId,
+    originalEventId: originalEvent.eventId,
+    originalEventHash: originalEvent.hash,
+    archival,
+  });
+}
+
+export async function authorize(rawRequest: NormalizedAuthorizationRequest | ToolRequest): Promise<Decision> {
+  const evaluation = await evaluateAuthorization(rawRequest);
+  const event = appendEvidenceEvent(evaluation, {
+    state: "NOT_EXECUTED",
+    statusCode: evaluation.decision === "DENY" ? 403 : 202,
+    bytesReturned: 0,
+    reason: evaluation.decision === "DENY" ? "AUTHORIZATION_DENIED" : "AUTHORIZATION_ONLY",
   });
 
   return {
-    decision: finalDecision,
-    reason: finalReason,
+    decision: evaluation.decision,
+    reason: evaluation.reason,
     eventId: event.eventId,
     hash: event.hash,
-    contractValidation
+    contractValidation: evaluation.contractValidation
   };
 }

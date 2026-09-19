@@ -9,11 +9,11 @@
 ---
 ## Current Phase 4A Implementation Boundary
 
-This PRD describes the product target architecture. The repository at checkpoint `bb50229` plus Phase 4A live integration currently implements a local Express PEP with local Cedar evaluation, optional Amazon Verified Permissions comparison, a process-local SHA-256 linear evidence hash chain, direct post-execution archival calls to EventBridge, DynamoDB, and S3 Object Lock, and post-hoc Bedrock investigation.
+This PRD describes the product target architecture. The repository currently implements a local Express PEP with local Cedar evaluation, optional Amazon Verified Permissions comparison, a process-local SHA-256 linear evidence hash chain, immutable hash-covered authorization/execution events, separate archival receipt events, direct post-execution archival calls to EventBridge, DynamoDB, and S3 Object Lock, bounded session reconstruction from local evidence, and post-hoc Bedrock investigation.
 
 Live AWS resources created in `ap-southeast-2`: AVP policy store `4VKzAMGEYyBg3ZkcpULube`, DynamoDB table `AegisEvidence`, S3 bucket `aegis-evidence-643220021031-ap-southeast-2` with Object Lock enabled, and the default EventBridge bus.
 
-Implemented in the current repository: a trusted local Task Contract registry that resolves `contractId` before Cedar/AVP authorization, backend-normalized tool/action/resource/argument metadata, and a static executor registry containing only the current `fs:read` filesystem boundary. Not implemented in the current repository: API Gateway, Lambda, KMS, cryptographic signed Task Contract verification, HMAC/session tokens, npm/git/shell/network/MCP execution, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
+Implemented in the current repository: a trusted local Task Contract registry that resolves `contractId` before Cedar/AVP authorization, backend-normalized tool/action/resource/argument metadata, immutable hash-covered execution evidence for the current filesystem path, separate archival receipts linked to primary event hashes, safe provenance-source hashing/redaction, bounded session reconstruction, and a static executor registry containing only the current `fs:read` filesystem boundary. Not implemented in the current repository: API Gateway, Lambda, KMS, cryptographic signed Task Contract verification, HMAC/session tokens, npm/git/shell/network/MCP execution, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
 
 ---
 

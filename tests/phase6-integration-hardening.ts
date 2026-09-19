@@ -53,12 +53,13 @@ async function testPhase6Hardening() {
     throw new Error("Events not recorded in the ledger!");
   }
   
-  console.log("\nTEST: One request creates one evidence event");
+  console.log("\nTEST: One request creates one primary evidence event");
   const recentEvents = ledger.filter((e: any) => e.sessionId === runSessionId);
-  if (recentEvents.length !== 2) {
-    throw new Error(`Expected exactly 2 events created in this test, got ${recentEvents.length}`);
+  const primaryEvents = recentEvents.filter((e: any) => e.eventType === "AUTHORIZATION_EXECUTION");
+  if (primaryEvents.length !== 2) {
+    throw new Error(`Expected exactly 2 primary events created in this test, got ${primaryEvents.length}`);
   }
-  console.log("✅ Exactly 1 evidence event created per request");
+  console.log("✅ Exactly 1 primary evidence event created per request");
 
   console.log("\nTEST: Hash chain remains valid across multiple requests");
   const verifyRes = await fetch("http://localhost:3000/api/agent/ledger/verify");

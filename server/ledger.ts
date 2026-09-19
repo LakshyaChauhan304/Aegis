@@ -1,36 +1,72 @@
 import crypto from 'crypto';
 import { ContractValidationStatus } from './task-contracts.js';
 
+export type EvidenceEventType = "AUTHORIZATION_EXECUTION" | "ARCHIVAL_RECEIPT";
+export type ExecutionState = "EXECUTED" | "NOT_EXECUTED" | "FAILED";
+export type ArchivalEvidenceStatus = "ARCHIVAL_SUCCESS" | "ARCHIVAL_PARTIAL" | "ARCHIVAL_FAILED";
+
+export interface ExecutionEvidence {
+  state: ExecutionState;
+  statusCode: number;
+  bytesReturned: number;
+  executorKey?: string;
+  reason?: string;
+}
+
+export interface ArchivalEvidence {
+  status: ArchivalEvidenceStatus;
+  sinks: {
+    eventBridge: "success" | "failed" | "pending";
+    dynamoDb: "success" | "failed" | "pending";
+    s3: "success" | "failed" | "pending";
+  };
+  eventBridgeEventId?: string;
+  failures?: {
+    eventBridge?: string;
+    dynamoDb?: string;
+    s3?: string;
+  };
+}
+
 export interface EvidenceEvent {
+  eventType: EvidenceEventType;
   eventId: string;
   timestamp: string;
   sessionId: string;
-  agentId: string;
-  contractId: string;
-  contractVersion: string;
-  contractHash: string;
-  contractValidation: {
+  agentId?: string;
+  contractId?: string;
+  contractVersion?: string;
+  contractHash?: string;
+  contractValidation?: {
     status: ContractValidationStatus;
     valid: boolean;
     reason?: string;
   };
-  tool: string;
-  normalizedAction: string;
-  resourceType: string;
-  resourceId: string;
-  argumentsHash: string;
-  argumentsPresent: boolean;
-  argumentsRedacted: boolean;
-  action: string;
-  resource: string;
-  context: Record<string, any>;
-  decision: "ALLOW" | "DENY";
-  reason: string;
-  authorization: {
+  tool?: string;
+  normalizedAction?: string;
+  resourceType?: string;
+  resourceId?: string;
+  argumentsHash?: string;
+  argumentsPresent?: boolean;
+  argumentsRedacted?: boolean;
+  action?: string;
+  resource?: string;
+  context?: Record<string, any>;
+  decision?: "ALLOW" | "DENY";
+  reason?: string;
+  authorization?: {
     provider: string; // 'local-cedar' | 'amazon-verified-permissions'
     policyStoreId?: string;
     error?: string;
   };
+  executionState?: ExecutionState;
+  httpStatus?: number;
+  bytesReturned?: number;
+  executorKey?: string;
+  execution?: ExecutionEvidence;
+  originalEventId?: string;
+  originalEventHash?: string;
+  archival?: ArchivalEvidence;
   previousHash: string;
   hash: string;
 }
@@ -102,6 +138,14 @@ export class Ledger {
 
   public getEvents(): EvidenceEvent[] {
     return this.events;
+  }
+
+  public getEvent(eventId: string): EvidenceEvent | undefined {
+    return this.events.find((event) => event.eventId === eventId);
+  }
+
+  public getSessionEvents(sessionId: string): EvidenceEvent[] {
+    return this.events.filter((event) => event.sessionId === sessionId);
   }
 
   public verifyChain(): boolean {

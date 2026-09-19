@@ -88,7 +88,7 @@ const fsReadExecutor: ToolExecutor = {
 
       return {
         statusCode: 404,
-        executionState: "NOT_EXECUTED",
+        executionState: "FAILED",
         bytesReturned: 0,
         error: "File not found",
       };

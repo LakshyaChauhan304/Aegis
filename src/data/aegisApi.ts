@@ -75,7 +75,7 @@ export function normaliseEvent(raw: any, index: number, firstTimestampMs: number
     http: raw.http != null ? raw.http : raw.httpStatus != null ? raw.httpStatus : null,
     prev: raw.prev || raw.previousHash || null,
     curr: raw.curr || raw.hash || raw.currentHash || null, // Backend uses hash
-    archivalStatus: raw.archivalStatus || null,
+    archivalStatus: raw.archivalStatus || raw.archival || null,
     detail: raw.detail || "",
   };
 }

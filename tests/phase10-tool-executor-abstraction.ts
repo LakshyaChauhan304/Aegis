@@ -118,7 +118,7 @@ async function main() {
   expectDenied(await invoke({ resource: "../.env", context: { trust: "UNTRUSTED_EXTERNAL" } }), "traversal variant");
 
   const missing = await fsReadExecutor.execute(normalizeToolRequest(requestBody({ resource: "definitely-missing-file.txt" })));
-  if (missing.statusCode !== 404 || missing.executionState !== "NOT_EXECUTED" || missing.bytesReturned !== 0) {
+  if (missing.statusCode !== 404 || missing.executionState !== "FAILED" || missing.bytesReturned !== 0) {
     throw new Error("fs executor did not preserve file-not-found semantics");
   }
 
