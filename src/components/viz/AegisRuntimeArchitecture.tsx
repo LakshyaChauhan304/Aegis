@@ -969,6 +969,14 @@ export default function AegisRuntimeArchitecture({ height = 320, event, chain, a
   }, [selected]);
 
   useEffect(() => {
+    if (!fullView) return;
+    document.body.classList.add("runtime-fullview-open");
+    return () => {
+      document.body.classList.remove("runtime-fullview-open");
+    };
+  }, [fullView]);
+
+  useEffect(() => {
     if (!stateRef.current) return;
     stateRef.current.selected = selected;
     stateRef.current.fullView = fullView;
