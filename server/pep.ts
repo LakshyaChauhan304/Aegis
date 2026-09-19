@@ -5,10 +5,12 @@ import * as cedar from "@cedar-policy/cedar-wasm";
 import { VerifiedPermissionsClient, IsAuthorizedCommand } from "@aws-sdk/client-verifiedpermissions";
 import { globalLedger } from "./ledger.js";
 import { ArchivalResults } from "./aws-archiver.js";
+import { ContractValidation, validateTaskContract } from "./task-contracts.js";
 
 export type ToolRequest = {
   sessionId: string;
   agentId: string;
+  contractId: string;
   tool: string;
   resource: string;
   action: string;
@@ -25,14 +27,15 @@ export type Decision = {
   eventId: string;
   hash: string;
   archivalStatus?: ArchivalResults;
+  contractValidation: ContractValidation;
 };
 
 // Load the local Cedar policy
 const policyPath = path.join(process.cwd(), "server/policies/devfix.cedar");
 const policyString = fs.readFileSync(policyPath, "utf8");
 
-const avpClient = new VerifiedPermissionsClient({ 
-  region: process.env.AWS_REGION || "us-east-1" 
+const avpClient = new VerifiedPermissionsClient({
+  region: process.env.AWS_REGION || "us-east-1"
 });
 
 function parseTimeoutMs(value: string | undefined, fallback: number) {
@@ -60,15 +63,24 @@ async function sendWithTimeout<T>(operation: (signal: AbortSignal) => Promise<T>
   }
 }
 
-function evaluateLocalCedar(request: ToolRequest) {
+function buildContractContext(request: ToolRequest, contractValidation: ContractValidation) {
+  return {
+    trust: request.context.trust,
+    source: request.context.source || "unknown",
+    sessionId: request.sessionId,
+    contractId: contractValidation.contractId || request.contractId || "unknown",
+    contractVersion: contractValidation.contractVersion || "unknown",
+    contractHash: contractValidation.contractHash || "unknown",
+    contractValid: contractValidation.valid,
+    contractValidationStatus: contractValidation.status,
+  };
+}
+
+function evaluateLocalCedar(request: ToolRequest, contractValidation: ContractValidation) {
   const principal = { type: "Aegis::Agent", id: request.agentId };
   const action = { type: "Aegis::Action", id: request.action };
   const resource = { type: "Aegis::File", id: request.resource };
-  
-  const context = {
-    trust: request.context.trust,
-    source: request.context.source || "unknown",
-  };
+  const context = buildContractContext(request, contractValidation);
 
   const entities = [
     { uid: principal, attrs: {}, parents: [] },
@@ -91,13 +103,15 @@ function evaluateLocalCedar(request: ToolRequest) {
       entities,
       policies: { staticPolicies: policiesObj }
     });
-    
+
     console.log("Local Cedar Result:", JSON.stringify(callResult, null, 2));
 
     const decision = callResult.type === "success" && callResult.response?.decision === "allow" ? "ALLOW" : "DENY";
-    const reason = callResult.type === "success" && callResult.response?.decision === "allow" 
-      ? `Authorized by ${callResult.response.diagnostics.reason.join(", ")}` 
-      : (callResult.type === "failure" ? callResult.errors.map(e => e.message).join(", ") : "Denied by local policy");
+    const reason = callResult.type === "success" && callResult.response?.decision === "allow"
+      ? `Authorized by ${callResult.response.diagnostics.reason.join(", ")}`
+      : contractValidation.valid
+        ? (callResult.type === "failure" ? callResult.errors.map(e => e.message).join(", ") : "Denied by local policy")
+        : `CONTRACT_VALIDATION_FAILED: ${contractValidation.status}`;
 
     return { decision, reason };
   } catch (err: any) {
@@ -106,8 +120,9 @@ function evaluateLocalCedar(request: ToolRequest) {
   }
 }
 
-async function evaluateAVP(request: ToolRequest) {
+async function evaluateAVP(request: ToolRequest, contractValidation: ContractValidation) {
   const policyStoreId = process.env.AVP_POLICY_STORE_ID || "UNCONFIGURED_STORE_ID";
+  const contractContext = buildContractContext(request, contractValidation);
   const cmd = new IsAuthorizedCommand({
     policyStoreId,
     principal: { entityType: "Aegis::Agent", entityId: request.agentId },
@@ -115,28 +130,36 @@ async function evaluateAVP(request: ToolRequest) {
     resource: { entityType: "Aegis::File", entityId: request.resource },
     context: {
       contextMap: {
-        trust: { string: request.context.trust },
-        source: { string: request.context.source || "unknown" }
+        trust: { string: contractContext.trust },
+        source: { string: contractContext.source },
+        sessionId: { string: contractContext.sessionId },
+        contractId: { string: contractContext.contractId },
+        contractVersion: { string: contractContext.contractVersion },
+        contractHash: { string: contractContext.contractHash },
+        contractValid: { boolean: contractContext.contractValid },
+        contractValidationStatus: { string: contractContext.contractValidationStatus },
       }
     }
   });
-  
+
   const response = await sendWithTimeout(
     (abortSignal) => avpClient.send(cmd, { abortSignal }),
     avpTimeoutMs
   );
-  
+
   const decision = response.decision === "ALLOW" ? "ALLOW" : "DENY";
   const reason = (response.determiningPolicies && response.determiningPolicies.length > 0) ? "Matched AVP policy" : "Denied by AVP";
-  
+
   return { decision: decision as "ALLOW" | "DENY", reason, policyStoreId };
 }
 
 export async function authorize(request: ToolRequest): Promise<Decision> {
+  const contractValidation = validateTaskContract(request);
+
   // 1. Local Cedar Evaluation
-  const localResult = evaluateLocalCedar(request);
-  
-  // 2. Amazon Verified Permissions Evaluation (Phase 3)
+  const localResult = evaluateLocalCedar(request, contractValidation);
+
+  // 2. Amazon Verified Permissions Evaluation
   let finalDecision: "ALLOW" | "DENY" = "DENY";
   let finalReason = "";
   let provider = "";
@@ -144,28 +167,24 @@ export async function authorize(request: ToolRequest): Promise<Decision> {
   let policyStoreId: string | undefined = undefined;
 
   try {
-    const avpResult = await evaluateAVP(request);
+    const avpResult = await evaluateAVP(request, contractValidation);
     policyStoreId = avpResult.policyStoreId;
-    
+
     // 3. Comparison
     if (localResult.decision !== avpResult.decision) {
       console.error(`[AEGIS PEP] AUTHORIZATION MISMATCH: Local Cedar says ${localResult.decision}, AVP says ${avpResult.decision}`);
-      // "If they disagree, stop and investigate. Do not silently make one override the other."
       finalDecision = "DENY";
       finalReason = "AUTHORIZATION_MISMATCH_ERROR";
       provider = "amazon-verified-permissions";
     } else {
-      // They agree
       finalDecision = avpResult.decision;
       finalReason = avpResult.reason;
       provider = "amazon-verified-permissions";
     }
   } catch (err: any) {
-    // Expected graceful fallback when AWS cloud credentials are not provisioned in local dev
     if (process.env.DEBUG_AEGIS_PEP) {
       console.warn(`[AEGIS PEP] AVP Unavailable, falling back to Local Cedar. Error: ${err.message}`);
     }
-    // Safe fallback to local evaluation
     finalDecision = localResult.decision as "ALLOW" | "DENY";
     finalReason = localResult.reason;
     provider = "local-cedar";
@@ -176,6 +195,14 @@ export async function authorize(request: ToolRequest): Promise<Decision> {
   const event = globalLedger.appendEvent({
     sessionId: request.sessionId || "unknown-session",
     agentId: request.agentId || "unknown-agent",
+    contractId: contractValidation.contractId || request.contractId || "unknown-contract",
+    contractVersion: contractValidation.contractVersion || "unknown",
+    contractHash: contractValidation.contractHash || "unknown",
+    contractValidation: {
+      status: contractValidation.status,
+      valid: contractValidation.valid,
+      reason: contractValidation.reason,
+    },
     action: request.action,
     resource: request.resource,
     context: request.context,
@@ -192,6 +219,7 @@ export async function authorize(request: ToolRequest): Promise<Decision> {
     decision: finalDecision,
     reason: finalReason,
     eventId: event.eventId,
-    hash: event.hash
+    hash: event.hash,
+    contractValidation
   };
 }

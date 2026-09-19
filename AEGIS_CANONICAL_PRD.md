@@ -13,7 +13,7 @@ This PRD describes the product target architecture. The repository at checkpoint
 
 Live AWS resources created in `ap-southeast-2`: AVP policy store `4VKzAMGEYyBg3ZkcpULube`, DynamoDB table `AegisEvidence`, S3 bucket `aegis-evidence-643220021031-ap-southeast-2` with Object Lock enabled, and the default EventBridge bus.
 
-Not implemented in the current repository: API Gateway, Lambda, KMS, signed Task Contract verification, shell execution, network enforcement, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
+Implemented in the current repository: a trusted local Task Contract registry that resolves `contractId` before Cedar/AVP authorization. Not implemented in the current repository: API Gateway, Lambda, KMS, cryptographic signed Task Contract verification, HMAC/session tokens, shell execution, network enforcement, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
 
 ---
 
@@ -35,7 +35,7 @@ AI agents are transitioning from generating text to executing autonomous actions
 - **LLM Guardrails** attempt to filter inputs and outputs probabilistically using another model, introducing non-deterministic latency, bypassable semantics, and hallucinations into the security gating path.
 - **Cloud IAM** assigns coarse, long-lived credentials to an application or instance, but has zero visibility into ephemeral agent tasks, dynamic session scope, prompt-injected tool parameters, or upstream context provenance.
 
-Aegis solves this by placing an out-of-band **Policy Enforcement Point (PEP)** between the autonomous agent and its tools. It evaluates every consequential action against a cryptographically bound **Task Contract** using deterministic **Cedar** policies, records every transition into a **tamper-evident SHA-256 linear hash-chain evidence ledger**, and leverages **Amazon Bedrock** post-hoc to explain incidents to human operators.
+Aegis solves this by placing an out-of-band **Policy Enforcement Point (PEP)** between the autonomous agent and its tools. The current repository evaluates every consequential action against a trusted local **Task Contract** registry and deterministic **Cedar** policies; cryptographically bound Task Contracts remain target architecture. It records every transition into a **tamper-evident SHA-256 linear hash-chain evidence ledger**, and leverages **Amazon Bedrock** post-hoc to explain incidents to human operators.
 
 ---
 
@@ -69,7 +69,7 @@ To prevent over-claiming and survive adversarial scrutiny from AWS Principal Eng
 1. **Truth 1: Aegis is not DevFix.**  
    Aegis is an agent-agnostic authorization and accountability control plane. DevFix is a reference vulnerability-remediation agent used to prove the platform under realistic conditions. Aegis does not dictate model weights or reasoning prompts.
 2. **Truth 2: Aegis does not prove internal AI intent.**  
-   Aegis establishes declared intent via a session-bound **Task Contract** concept. Signed Task Contract enforcement is target architecture and is not implemented in the current repository. Aegis never claims to read internal neural representations.
+   Aegis establishes declared intent via a session-bound **Task Contract** concept. The current repository enforces a trusted local contract registry; cryptographically signed Task Contract verification remains target architecture and is not implemented. Aegis never claims to read internal neural representations.
 3. **Truth 3: Aegis does not claim mathematical causality.**  
    Aegis models **Evidence-Backed Lineage**. When an agent ingests an untrusted artifact (e.g., an external `README.md`) and subsequently attempts an out-of-scope credential read (`.env`), Aegis correlates them via temporal sequence, context provenance, and monotonic taint tracking within a Directed Acyclic Graph (DAG).
 4. **Truth 4: Amazon Bedrock has zero runtime authorization authority.**  
@@ -110,7 +110,7 @@ Every autonomous agent session lifecycle is governed across five discrete stages
 
 ### Stage 2: Decide (Deterministic Cedar Evaluation)
 - Structured Request Tuple: `(Principal, Action, Resource, Context)`.
-- Evaluated against the declared Cedar policy set. Signed Task Contract verification is target architecture and is not implemented in the current repository.
+- Evaluated against the declared Cedar policy set with trusted local Task Contract context. Signed Task Contract verification is target architecture and is not implemented in the current repository.
 - Zero reliance on probabilistic LLM responses during critical path execution.
 
 ### Stage 3: Block (Out-of-Band Enforcement)
@@ -207,7 +207,7 @@ A critical judge attack vector is conflating in-process Cedar evaluation with cl
 ## 6. Protocols & Canonical Data Schemas
 
 ### 6.1 Target Signed Task Contract Schema
-Generated at session initialization by the human operator or parent orchestrator in the target architecture. The current repository shows fixture/demo scope data and does not verify signed Task Contracts:
+Generated at session initialization by the human operator or parent orchestrator in the target architecture. The current repository uses a trusted local contract registry for enforcement and does not verify signed Task Contracts:
 
 ```json
 {
@@ -411,7 +411,7 @@ Every engineering requirement in Aegis is bound to a strict 6-stage proof chain:
 1. **How do you know it was unauthorized?**  
    *“Cedar evaluated the structured request against the declared scope and returned an explicit DENY before filesystem execution. Historical project test measurements observed about 1.42ms locally.”*
 2. **How do you know what the agent was supposed to do?**  
-   *“The current repository uses declared demo scope and Cedar policy to define allowable tools and resources. Cryptographically signed Task Contracts are target architecture only.”*
+   *“The current repository uses a trusted local Task Contract registry and Cedar policy to define allowable tools and resources. Cryptographically signed Task Contracts are target architecture only.”*
 3. **How do you know the README was untrusted?**  
    *“The Aegis Gateway ingress filter tagged it as `UNTRUSTED_EXTERNAL` based on its location in external upstream dependencies.”*
 4. **How do you know the README influenced the `.env` request?**  
@@ -485,9 +485,9 @@ To ensure 100% demo reliability under live stage pressure, Aegis incorporates 10
 
 1. **AWS Verified Permissions API Unavailable / High Latency:**  
    *Recovery & Fallback Trust Model:* The Aegis PEP automatically fails over to the local in-process WebAssembly/Rust Cedar evaluation engine (<2ms) without breaking the session.  
-   *Architectural Defense (Why trust local engine?):* The local engine is not dynamically generating policy. It evaluates the exact same signed, versioned Cedar policy bundle. Failover preserves the policy decision mechanism rather than changing the authorization policy.  
+   *Architectural Defense (Why trust local engine?):* The local engine is not dynamically generating policy. It evaluates the repository Cedar policy file with normalized Task Contract context. Failover preserves the policy decision mechanism rather than changing the authorization policy.
    *Fallback Verification Chain:*  
-   Current repository: `server/policies/devfix.cedar` -> local Cedar evaluation. Target architecture may add signed policy bundles and KMS verification, but they are not implemented here.
+   Current repository: trusted local Task Contract registry -> `server/policies/devfix.cedar` -> local Cedar evaluation. Target architecture may add signed policy bundles and KMS verification, but they are not implemented here.
 2. **Amazon Bedrock Slow / Rate-Limited:**  
    *Recovery:* The UI displays a pre-cached, cryptographically verified grounding envelope and synthesis report from baseline test `test_grounded_envelope_01`.
 3. **Accidental State Corruption in Demo:**  

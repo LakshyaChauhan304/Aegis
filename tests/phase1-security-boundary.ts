@@ -6,6 +6,7 @@ async function testAegis() {
     body: JSON.stringify({
       sessionId: "test-sess",
       agentId: "DevFix",
+      contractId: "tc_devfix_dependency_remediation_v1",
       tool: "fs",
       resource: "package.json",
       action: "fs:read",
@@ -24,6 +25,7 @@ async function testAegis() {
     body: JSON.stringify({
       sessionId: "test-sess",
       agentId: "DevFix",
+      contractId: "tc_devfix_dependency_remediation_v1",
       tool: "fs",
       resource: ".env",
       action: "fs:read",

@@ -1,10 +1,19 @@
 import crypto from 'crypto';
+import { ContractValidationStatus } from './task-contracts.js';
 
 export interface EvidenceEvent {
   eventId: string;
   timestamp: string;
   sessionId: string;
   agentId: string;
+  contractId: string;
+  contractVersion: string;
+  contractHash: string;
+  contractValidation: {
+    status: ContractValidationStatus;
+    valid: boolean;
+    reason?: string;
+  };
   action: string;
   resource: string;
   context: Record<string, any>;
@@ -20,9 +29,8 @@ export interface EvidenceEvent {
 }
 
 /**
- * Recursively sorts object keys to ensure mathematically identical 
- * JSON representations for structurally identical objects, regardless 
- * of insertion order.
+ * Recursively sorts object keys to ensure identical JSON representations for
+ * structurally identical objects, regardless of insertion order.
  */
 function sortKeysRecursive(obj: any): any {
   if (obj === null || typeof obj !== 'object') {
@@ -46,10 +54,10 @@ function sortKeysRecursive(obj: any): any {
 export function canonicalize(event: Omit<EvidenceEvent, 'hash'> | EvidenceEvent): string {
   // Extract hash so it's not included in its own digest
   const { hash, ...unhashed } = event as EvidenceEvent;
-  
+
   // Recursively sort all nested keys to ensure absolute determinism
   const sorted = sortKeysRecursive(unhashed);
-  
+
   return JSON.stringify(sorted);
 }
 
@@ -81,7 +89,7 @@ export class Ledger {
     const hash = computeHash(unhashedEvent);
     const fullEvent: EvidenceEvent = { ...unhashedEvent, hash };
     this.events.push(fullEvent);
-    
+
     return fullEvent;
   }
 

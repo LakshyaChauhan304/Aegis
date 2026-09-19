@@ -62,7 +62,23 @@ async function startServer() {
   // Aegis Agent Invoke Endpoint
   app.post("/api/agent/invoke", async (req, res) => {
     const request: ToolRequest = req.body;
-    
+    const missingFields = ["sessionId", "agentId", "contractId", "tool", "action", "resource"]
+      .filter((field) => typeof (request as any)?.[field] !== "string" || !(request as any)[field].trim());
+
+    if (!request?.context || typeof request.context.trust !== "string" || !request.context.trust.trim()) {
+      missingFields.push("context.trust");
+    }
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: "Malformed request",
+        reason: "Missing required authorization fields",
+        missingFields,
+        executionState: "NOT_EXECUTED",
+        bytesReturned: 0,
+      });
+    }
+
     // 1. Evaluate authorization (Decision is FIXED and ledger is appended inside)
     const decision: Decision = await authorize(request);
     

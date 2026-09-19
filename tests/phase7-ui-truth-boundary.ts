@@ -44,6 +44,7 @@ async function testPhase7TruthBoundary() {
     body: JSON.stringify({
       sessionId: "sess_truth_" + Date.now(),
       agentId: "DevFix",
+      contractId: "tc_devfix_dependency_remediation_v1",
       tool: "shell",
       action: "shell:exec",
       resource: "npm audit --json",
@@ -62,6 +63,7 @@ async function testPhase7TruthBoundary() {
     body: JSON.stringify({
       sessionId: "sess_truth_" + Date.now(),
       agentId: "DevFix",
+      contractId: "tc_devfix_dependency_remediation_v1",
       tool: "fs",
       action: "fs:read",
       resource: ".env",

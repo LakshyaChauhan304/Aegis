@@ -7,7 +7,8 @@ async function testPhase6Hardening() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sessionId: runSessionId,
-        agentId: "DevFix_Test",
+        agentId: "DevFix",
+        contractId: "tc_devfix_dependency_remediation_v1",
         tool,
         resource,
         action,

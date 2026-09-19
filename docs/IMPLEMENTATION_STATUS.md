@@ -9,10 +9,11 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 | Tool call interface | IMPLEMENTED | VERIFIED | `/api/agent/invoke` |
 | Local Cedar evaluation | IMPLEMENTED | VERIFIED | `server/policies/devfix.cedar` |
 | .env protection | IMPLEMENTED | VERIFIED | DENY returns HTTP 403 before file read |
-| Evidence ledger | IMPLEMENTED | VERIFIED | Process-local SHA-256 linear hash chain |
+| Evidence ledger | IMPLEMENTED | VERIFIED | Process-local SHA-256 linear hash chain; contract metadata participates in event hashes |
 | Shell execution | NOT IMPLEMENTED | VERIFIED UNAVAILABLE | Unsupported action returns no execution result |
 | Network enforcement | NOT IMPLEMENTED | NOT APPLICABLE | No network tool exists |
-| Signed Task Contracts | NOT IMPLEMENTED | NOT APPLICABLE | UI/docs may show fixture contract data only |
+| Trusted local Task Contract enforcement | IMPLEMENTED | VERIFIED BY TEST | `contractId` resolves against backend registry before Cedar/AVP authorization |
+| Signed/KMS Task Contract verification | NOT IMPLEMENTED | NOT APPLICABLE | No cryptographic signature, HMAC, or KMS verification is implemented |
 | KMS-backed signing | NOT IMPLEMENTED | NOT APPLICABLE | KMS is not used by runtime code |
 | API Gateway/Lambda | NOT IMPLEMENTED | NOT LIVE | Current backend is local Express |
 
