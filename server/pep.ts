@@ -5,20 +5,13 @@ import * as cedar from "@cedar-policy/cedar-wasm";
 import { VerifiedPermissionsClient, IsAuthorizedCommand } from "@aws-sdk/client-verifiedpermissions";
 import { globalLedger } from "./ledger.js";
 import { ArchivalResults } from "./aws-archiver.js";
-import { ContractValidation, validateTaskContract } from "./task-contracts.js";
+import { ContractValidation, NormalizedAuthorizationRequest, ToolRequest, normalizeToolRequest, validateTaskContract } from "./task-contracts.js";
 
-export type ToolRequest = {
-  sessionId: string;
-  agentId: string;
-  contractId: string;
-  tool: string;
-  resource: string;
-  action: string;
-  context: {
-    trust: string;
-    source?: string;
-  };
-};
+export type { ToolRequest, NormalizedAuthorizationRequest };
+
+function isNormalizedRequest(request: NormalizedAuthorizationRequest | ToolRequest): request is NormalizedAuthorizationRequest {
+  return typeof (request as NormalizedAuthorizationRequest).operation === "object";
+}
 
 export type Decision = {
   decision: "ALLOW" | "DENY";
@@ -63,24 +56,31 @@ async function sendWithTimeout<T>(operation: (signal: AbortSignal) => Promise<T>
   }
 }
 
-function buildContractContext(request: ToolRequest, contractValidation: ContractValidation) {
+export function buildAuthorizationContext(request: NormalizedAuthorizationRequest, contractValidation: ContractValidation) {
   return {
     trust: request.context.trust,
-    source: request.context.source || "unknown",
-    sessionId: request.sessionId,
-    contractId: contractValidation.contractId || request.contractId || "unknown",
+    source: request.context.source,
+    sessionId: request.session.sessionId,
+    contractId: contractValidation.contractId || request.contract.contractId || "unknown",
     contractVersion: contractValidation.contractVersion || "unknown",
     contractHash: contractValidation.contractHash || "unknown",
     contractValid: contractValidation.valid,
     contractValidationStatus: contractValidation.status,
+    tool: request.operation.tool,
+    normalizedAction: request.operation.action,
+    resourceType: request.operation.resource.type,
+    resourceId: request.operation.resource.id,
+    argumentsHash: request.operation.arguments.hash,
+    argumentsPresent: request.operation.arguments.present,
+    argumentsRedacted: request.operation.arguments.redacted,
   };
 }
 
-function evaluateLocalCedar(request: ToolRequest, contractValidation: ContractValidation) {
-  const principal = { type: "Aegis::Agent", id: request.agentId };
-  const action = { type: "Aegis::Action", id: request.action };
-  const resource = { type: "Aegis::File", id: request.resource };
-  const context = buildContractContext(request, contractValidation);
+function evaluateLocalCedar(request: NormalizedAuthorizationRequest, contractValidation: ContractValidation) {
+  const principal = { type: "Aegis::Agent", id: request.principal.agentId };
+  const action = { type: "Aegis::Action", id: request.operation.actionId };
+  const resource = { type: "Aegis::File", id: request.operation.resource.id };
+  const context = buildAuthorizationContext(request, contractValidation);
 
   const entities = [
     { uid: principal, attrs: {}, parents: [] },
@@ -120,14 +120,14 @@ function evaluateLocalCedar(request: ToolRequest, contractValidation: ContractVa
   }
 }
 
-async function evaluateAVP(request: ToolRequest, contractValidation: ContractValidation) {
+async function evaluateAVP(request: NormalizedAuthorizationRequest, contractValidation: ContractValidation) {
   const policyStoreId = process.env.AVP_POLICY_STORE_ID || "UNCONFIGURED_STORE_ID";
-  const contractContext = buildContractContext(request, contractValidation);
+  const contractContext = buildAuthorizationContext(request, contractValidation);
   const cmd = new IsAuthorizedCommand({
     policyStoreId,
-    principal: { entityType: "Aegis::Agent", entityId: request.agentId },
-    action: { actionType: "Aegis::Action", actionId: request.action },
-    resource: { entityType: "Aegis::File", entityId: request.resource },
+    principal: { entityType: "Aegis::Agent", entityId: request.principal.agentId },
+    action: { actionType: "Aegis::Action", actionId: request.operation.actionId },
+    resource: { entityType: "Aegis::File", entityId: request.operation.resource.id },
     context: {
       contextMap: {
         trust: { string: contractContext.trust },
@@ -138,6 +138,13 @@ async function evaluateAVP(request: ToolRequest, contractValidation: ContractVal
         contractHash: { string: contractContext.contractHash },
         contractValid: { boolean: contractContext.contractValid },
         contractValidationStatus: { string: contractContext.contractValidationStatus },
+        tool: { string: contractContext.tool },
+        normalizedAction: { string: contractContext.normalizedAction },
+        resourceType: { string: contractContext.resourceType },
+        resourceId: { string: contractContext.resourceId },
+        argumentsHash: { string: contractContext.argumentsHash },
+        argumentsPresent: { boolean: contractContext.argumentsPresent },
+        argumentsRedacted: { boolean: contractContext.argumentsRedacted },
       }
     }
   });
@@ -153,7 +160,8 @@ async function evaluateAVP(request: ToolRequest, contractValidation: ContractVal
   return { decision: decision as "ALLOW" | "DENY", reason, policyStoreId };
 }
 
-export async function authorize(request: ToolRequest): Promise<Decision> {
+export async function authorize(rawRequest: NormalizedAuthorizationRequest | ToolRequest): Promise<Decision> {
+  const request = isNormalizedRequest(rawRequest) ? rawRequest : normalizeToolRequest(rawRequest);
   const contractValidation = validateTaskContract(request);
 
   // 1. Local Cedar Evaluation
@@ -193,9 +201,9 @@ export async function authorize(request: ToolRequest): Promise<Decision> {
 
   // 4. Record Evidence locally
   const event = globalLedger.appendEvent({
-    sessionId: request.sessionId || "unknown-session",
-    agentId: request.agentId || "unknown-agent",
-    contractId: contractValidation.contractId || request.contractId || "unknown-contract",
+    sessionId: request.session.sessionId || "unknown-session",
+    agentId: request.principal.agentId || "unknown-agent",
+    contractId: contractValidation.contractId || request.contract.contractId || "unknown-contract",
     contractVersion: contractValidation.contractVersion || "unknown",
     contractHash: contractValidation.contractHash || "unknown",
     contractValidation: {
@@ -203,8 +211,15 @@ export async function authorize(request: ToolRequest): Promise<Decision> {
       valid: contractValidation.valid,
       reason: contractValidation.reason,
     },
-    action: request.action,
-    resource: request.resource,
+    tool: request.operation.tool,
+    normalizedAction: request.operation.action,
+    resourceType: request.operation.resource.type,
+    resourceId: request.operation.resource.id,
+    argumentsHash: request.operation.arguments.hash,
+    argumentsPresent: request.operation.arguments.present,
+    argumentsRedacted: request.operation.arguments.redacted,
+    action: request.operation.actionId,
+    resource: request.operation.resource.id,
     context: request.context,
     decision: finalDecision,
     reason: finalReason,

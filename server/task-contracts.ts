@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import path from "path";
 
 export type TrustLevel = "TRUSTED" | "UNTRUSTED_EXTERNAL";
 
@@ -18,8 +19,59 @@ export type TaskContract = {
       action: string;
       resource: string;
       trust: TrustLevel[];
+      arguments?: {
+        mode: "none";
+      };
     }>;
     deniedResources: string[];
+  };
+};
+
+export type ToolRequest = {
+  sessionId: string;
+  agentId: string;
+  contractId: string;
+  tool: string;
+  resource: string;
+  action: string;
+  arguments?: unknown;
+  context: {
+    trust: string;
+    source?: string;
+  };
+};
+
+export type NormalizedAuthorizationRequest = {
+  principal: {
+    agentId: string;
+  };
+  session: {
+    sessionId: string;
+  };
+  contract: {
+    contractId: string;
+  };
+  operation: {
+    tool: string;
+    action: string;
+    actionId: string;
+    resource: {
+      type: "file";
+      raw: string;
+      id: string;
+      valid: boolean;
+      reason?: string;
+    };
+    arguments: {
+      present: boolean;
+      value: unknown;
+      hash: string;
+      redacted: boolean;
+    };
+  };
+  context: {
+    trust: string;
+    source: string;
   };
 };
 
@@ -31,7 +83,8 @@ export type ContractValidationStatus =
   | "SESSION_MISMATCH"
   | "OUT_OF_SCOPE_ACTION"
   | "OUT_OF_SCOPE_RESOURCE"
-  | "TRUST_CONSTRAINT_FAILED";
+  | "TRUST_CONSTRAINT_FAILED"
+  | "ARGUMENT_CONSTRAINT_FAILED";
 
 export type ContractValidation = {
   status: ContractValidationStatus;
@@ -84,8 +137,16 @@ function sortKeysRecursive(value: any): any {
   return sorted;
 }
 
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(sortKeysRecursive(value)) ?? "undefined";
+}
+
+function hashCanonical(value: unknown): string {
+  return crypto.createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
 function canonicalContract(definition: ContractDefinition): string {
-  return JSON.stringify(sortKeysRecursive(definition));
+  return canonicalJson(definition);
 }
 
 function withHash(definition: ContractDefinition): TaskContract {
@@ -109,16 +170,98 @@ export function listTaskContracts(): TaskContract[] {
 }
 
 export type ContractRequest = {
-  contractId?: string;
-  sessionId?: string;
-  agentId?: string;
-  tool?: string;
-  action?: string;
-  resource?: string;
+  contract?: {
+    contractId?: string;
+  };
+  session?: {
+    sessionId?: string;
+  };
+  principal?: {
+    agentId?: string;
+  };
+  operation?: {
+    tool?: string;
+    actionId?: string;
+    resource?: {
+      id?: string;
+      valid?: boolean;
+      reason?: string;
+    };
+    arguments?: {
+      present?: boolean;
+    };
+  };
   context?: {
     trust?: string;
   };
 };
+
+function normalizeAction(actionId: string): string {
+  if (actionId === "fs:read") return "read";
+  const parts = actionId.split(":");
+  return parts[parts.length - 1] || actionId;
+}
+
+function normalizeFileResource(rawResource: string): NormalizedAuthorizationRequest["operation"]["resource"] {
+  const raw = rawResource;
+  const projectRoot = path.resolve(process.cwd());
+  const candidate = path.isAbsolute(raw)
+    ? path.resolve(raw)
+    : path.resolve(projectRoot, raw);
+  const relative = path.relative(projectRoot, candidate);
+
+  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
+    return {
+      type: "file",
+      raw,
+      id: raw.replace(/\\/g, "/"),
+      valid: false,
+      reason: "resource path resolves outside the project root",
+    };
+  }
+
+  const id = relative.split(path.sep).join("/");
+  return {
+    type: "file",
+    raw,
+    id: id === "" ? "." : id,
+    valid: true,
+  };
+}
+
+export function normalizeToolRequest(request: ToolRequest): NormalizedAuthorizationRequest {
+  const argumentsPresent = Object.prototype.hasOwnProperty.call(request, "arguments");
+  const argumentValue = argumentsPresent ? request.arguments : [];
+  const argumentHash = hashCanonical(argumentValue);
+
+  return {
+    principal: {
+      agentId: request.agentId,
+    },
+    session: {
+      sessionId: request.sessionId,
+    },
+    contract: {
+      contractId: request.contractId,
+    },
+    operation: {
+      tool: request.tool,
+      action: normalizeAction(request.action),
+      actionId: request.action,
+      resource: normalizeFileResource(request.resource),
+      arguments: {
+        present: argumentsPresent,
+        value: argumentsPresent ? undefined : [],
+        hash: argumentHash,
+        redacted: argumentsPresent,
+      },
+    },
+    context: {
+      trust: request.context.trust,
+      source: request.context.source || "unknown",
+    },
+  };
+}
 
 function sessionMatches(contract: TaskContract, sessionId: string | undefined): boolean {
   if (!sessionId) return false;
@@ -127,17 +270,17 @@ function sessionMatches(contract: TaskContract, sessionId: string | undefined): 
 }
 
 export function validateTaskContract(request: ContractRequest): ContractValidation {
-  if (!request.contractId) {
+  if (!request.contract?.contractId) {
     return { status: "MISSING_CONTRACT", valid: false, reason: "contractId is required" };
   }
 
-  const contract = getTaskContract(request.contractId);
+  const contract = getTaskContract(request.contract.contractId);
   if (!contract) {
     return {
       status: "UNKNOWN_CONTRACT",
       valid: false,
       reason: "contractId was not found in the trusted local registry",
-      contractId: request.contractId,
+      contractId: request.contract.contractId,
     };
   }
 
@@ -147,30 +290,38 @@ export function validateTaskContract(request: ContractRequest): ContractValidati
     contractHash: contract.contractHash,
   };
 
-  if (request.agentId !== contract.agentId) {
+  if (request.principal?.agentId !== contract.agentId) {
     return { ...base, status: "AGENT_MISMATCH", valid: false, reason: "request agentId is not bound to this contract" };
   }
 
-  if (!sessionMatches(contract, request.sessionId)) {
+  if (!sessionMatches(contract, request.session?.sessionId)) {
     return { ...base, status: "SESSION_MISMATCH", valid: false, reason: "request sessionId is not bound to this contract" };
   }
 
   const actionAllowed = contract.scope.allowed.some((entry) =>
-    entry.tool === request.tool && entry.action === request.action
+    entry.tool === request.operation?.tool && entry.action === request.operation?.actionId
   );
   if (!actionAllowed) {
     return { ...base, status: "OUT_OF_SCOPE_ACTION", valid: false, reason: "requested tool/action is outside contract scope" };
   }
 
+  if (!request.operation?.resource?.valid) {
+    return { ...base, status: "OUT_OF_SCOPE_RESOURCE", valid: false, reason: request.operation?.resource?.reason || "requested resource is outside contract scope" };
+  }
+
   const resourceEntry = contract.scope.allowed.find((entry) =>
-    entry.tool === request.tool && entry.action === request.action && entry.resource === request.resource
+    entry.tool === request.operation?.tool && entry.action === request.operation?.actionId && entry.resource === request.operation?.resource?.id
   );
-  if (!resourceEntry || contract.scope.deniedResources.includes(String(request.resource || ""))) {
+  if (!resourceEntry || contract.scope.deniedResources.includes(String(request.operation?.resource?.id || ""))) {
     return { ...base, status: "OUT_OF_SCOPE_RESOURCE", valid: false, reason: "requested resource is outside contract scope" };
   }
 
   if (!resourceEntry.trust.includes(request.context?.trust as TrustLevel)) {
     return { ...base, status: "TRUST_CONSTRAINT_FAILED", valid: false, reason: "request provenance does not satisfy contract trust constraints" };
+  }
+
+  if ((resourceEntry.arguments?.mode || "none") === "none" && request.operation?.arguments?.present) {
+    return { ...base, status: "ARGUMENT_CONSTRAINT_FAILED", valid: false, reason: "requested arguments are outside contract scope" };
   }
 
   return { ...base, status: "VALID", valid: true };

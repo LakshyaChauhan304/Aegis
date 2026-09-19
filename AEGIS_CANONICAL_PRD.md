@@ -13,7 +13,7 @@ This PRD describes the product target architecture. The repository at checkpoint
 
 Live AWS resources created in `ap-southeast-2`: AVP policy store `4VKzAMGEYyBg3ZkcpULube`, DynamoDB table `AegisEvidence`, S3 bucket `aegis-evidence-643220021031-ap-southeast-2` with Object Lock enabled, and the default EventBridge bus.
 
-Implemented in the current repository: a trusted local Task Contract registry that resolves `contractId` before Cedar/AVP authorization. Not implemented in the current repository: API Gateway, Lambda, KMS, cryptographic signed Task Contract verification, HMAC/session tokens, shell execution, network enforcement, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
+Implemented in the current repository: a trusted local Task Contract registry that resolves `contractId` before Cedar/AVP authorization, plus backend-normalized tool/action/resource/argument metadata for the current filesystem read boundary. Not implemented in the current repository: API Gateway, Lambda, KMS, cryptographic signed Task Contract verification, HMAC/session tokens, npm/git/shell/network/MCP execution, container isolation, and EventBridge consumers. Bedrock remains post-hoc only; live invocation requires an active configured model or inference profile and account model access.
 
 ---
 

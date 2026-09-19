@@ -14,6 +14,13 @@ export interface EvidenceEvent {
     valid: boolean;
     reason?: string;
   };
+  tool: string;
+  normalizedAction: string;
+  resourceType: string;
+  resourceId: string;
+  argumentsHash: string;
+  argumentsPresent: boolean;
+  argumentsRedacted: boolean;
   action: string;
   resource: string;
   context: Record<string, any>;
