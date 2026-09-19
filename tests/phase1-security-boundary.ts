@@ -1,8 +1,10 @@
+import { authHeaders } from "./test-auth.ts";
+
 async function testAegis() {
   console.log("--- TEST A: READ package.json ---");
   const resA = await fetch("http://localhost:3000/api/agent/invoke", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       sessionId: "test-sess",
       agentId: "DevFix",
@@ -21,7 +23,7 @@ async function testAegis() {
   console.log("\n--- TEST B: READ .env ---");
   const resB = await fetch("http://localhost:3000/api/agent/invoke", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       sessionId: "test-sess",
       agentId: "DevFix",

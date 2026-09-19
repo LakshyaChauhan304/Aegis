@@ -6,6 +6,7 @@ import {
   validateEvidenceReferences,
 } from "../server/bedrock-investigator.js";
 import { Ledger, computeHash } from "../server/ledger.js";
+import { authHeaders } from "./test-auth.ts";
 
 const SECRET_MARKERS = [
   "AWS_SECRET_ACCESS_KEY=phase5-secret",
@@ -148,7 +149,7 @@ function structuredText(eventId: string, eventHash: string, extraReference?: any
 async function invokeRuntime(resource: string, bodyOverrides: Record<string, any> = {}) {
   const res = await fetch("http://localhost:3000/api/agent/invoke", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       sessionId: "sess_bedrock_test_" + Date.now(),
       agentId: "DevFix",
@@ -174,7 +175,7 @@ async function testRuntimeIsolation() {
   const hashBefore = deny.data.decision.hash;
   const previousModel = process.env.BEDROCK_MODEL_ID;
   delete process.env.BEDROCK_MODEL_ID;
-  const investigation = await fetch(`http://localhost:3000/api/agent/investigate/${deny.data.decision.eventId}`);
+  const investigation = await fetch(`http://localhost:3000/api/agent/investigate/${deny.data.decision.eventId}`, { headers: authHeaders() });
   const investigationData = await investigation.json();
   if (previousModel) process.env.BEDROCK_MODEL_ID = previousModel;
 
@@ -184,7 +185,7 @@ async function testRuntimeIsolation() {
     "Missing model did not return safe classification"
   );
 
-  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger");
+  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger", { headers: authHeaders() });
   const ledger = await ledgerRes.json();
   const eventAfter = ledger.find((event: any) => event.eventId === deny.data.decision.eventId);
   assert(eventAfter?.hash === hashBefore, "Bedrock failure changed primary event hash");
@@ -392,11 +393,11 @@ async function testRuntimeDecisionIndependence() {
   assert(allow.data.executionState === "EXECUTED", "ALLOW request did not execute");
 
   delete process.env.BEDROCK_MODEL_ID;
-  const investigation = await fetch(`http://localhost:3000/api/agent/investigate/${allow.data.decision.eventId}`);
+  const investigation = await fetch(`http://localhost:3000/api/agent/investigate/${allow.data.decision.eventId}`, { headers: authHeaders() });
   const investigationData = await investigation.json();
   assert(investigationData.investigationStatus?.status === "failed", "Bedrock failure did not degrade safely");
 
-  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger");
+  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger", { headers: authHeaders() });
   const ledger = await ledgerRes.json();
   const eventAfter = ledger.find((event: any) => event.eventId === allow.data.decision.eventId);
   assert(eventAfter?.decision === "ALLOW", "Bedrock failure changed runtime authorization decision");

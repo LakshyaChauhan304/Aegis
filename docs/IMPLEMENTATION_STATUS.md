@@ -18,6 +18,7 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 | Static tool executor registry | IMPLEMENTED | VERIFIED BY TEST | Registry contains only `fs:fs:read`; authorization still occurs before executor lookup |
 | Bedrock grounding envelope | IMPLEMENTED | VERIFIED BY TEST | `/api/agent/investigate/:eventId` builds a bounded allowlisted session envelope with event IDs, hashes, verification status, authorization/execution metadata, and safe provenance metadata |
 | Structured investigation result | IMPLEMENTED | VERIFIED BY TEST | Bedrock output is parsed as structured JSON with evidence references validated against supplied event IDs/hashes; invalid references are marked unverified |
+| Backend API trust boundary | IMPLEMENTED | VERIFIED BY TEST | `AEGIS_API_TOKEN` bearer authentication protects agent invoke, ledger, reconstruction, investigation, and policy-source routes before normalization or execution |
 | Argument execution | NOT IMPLEMENTED | VERIFIED UNAVAILABLE | Arguments are represented by presence/redaction/hash metadata; unexpected current `fs:read` arguments fail closed |
 | Signed/KMS Task Contract verification | NOT IMPLEMENTED | NOT APPLICABLE | No cryptographic signature, HMAC, or KMS verification is implemented |
 | KMS-backed signing | NOT IMPLEMENTED | NOT APPLICABLE | KMS is not used by runtime code |
@@ -42,4 +43,7 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 - Bedrock is post-hoc only and never participates in ALLOW/DENY decisions. It receives an allowlisted grounding envelope derived from recorded evidence, and failures are reported with safe classifications such as `BEDROCK_MODEL_NOT_CONFIGURED`.
 - Bedrock does not prove hidden agent intent or mathematical causality; structured investigation output is advisory and includes event/hash references for human verification.
 - Local Cedar remains the fallback/reference policy; AVP mismatch fails closed.
+- API bearer authentication is an access boundary for protected backend routes. It does not cryptographically authenticate the agent, bind model identity, or replace Task Contract/Cedar authorization.
+- `AEGIS_API_TOKEN` is an API access-control boundary for the local/demo deployment. It is not cryptographic authentication of an AI agent, and a token exposed to a browser client must not be treated as confidential. When supplied to a browser client through Vite environment configuration as `VITE_AEGIS_API_TOKEN`, the token is necessarily observable by that client and therefore is not a confidential credential or cryptographic agent identity.
+- `/api/health`, `/api/aegis/status`, and `/api/aegis/capabilities` remain public truth/status endpoints; `/api/aegis/policy` and `/api/agent/*` are protected.
 - No credentials, access keys, session tokens, or passwords are committed.

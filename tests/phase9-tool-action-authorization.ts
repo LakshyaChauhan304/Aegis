@@ -2,12 +2,13 @@ import crypto from "crypto";
 import path from "path";
 import { buildAuthorizationContext } from "../server/pep.ts";
 import { normalizeToolRequest, validateTaskContract, ToolRequest } from "../server/task-contracts.ts";
+import { authFetch, authHeaders } from "./test-auth.ts";
 
 const CONTRACT_ID = "tc_devfix_dependency_remediation_v1";
 const runSessionId = "sess_contract_" + Date.now();
 
 async function json(apiPath: string, init?: RequestInit) {
-  const res = await fetch(`http://localhost:3000${apiPath}`, init);
+  const res = await authFetch(apiPath, init);
   const data = await res.json();
   return { res, data };
 }
@@ -28,7 +29,7 @@ function requestBody(overrides: Record<string, any> = {}): ToolRequest {
 async function invoke(overrides: Record<string, any> = {}) {
   return json("/api/agent/invoke", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(requestBody(overrides)),
   });
 }

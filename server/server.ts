@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import path from "path";
 import { appendArchivalReceiptEvent, appendEvidenceEvent, evaluateAuthorization, ToolRequest, Decision } from "./pep.js";
 import { ArchivalEvidence, globalLedger } from "./ledger.js";
@@ -45,6 +46,27 @@ function safeExecutionReason(result: ExecutionResult, fallback: string) {
   return fallback;
 }
 
+function tokenMatches(expected: string, supplied: string) {
+  const expectedBytes = Buffer.from(expected);
+  const suppliedBytes = Buffer.from(supplied);
+  return expectedBytes.length === suppliedBytes.length && crypto.timingSafeEqual(expectedBytes, suppliedBytes);
+}
+
+function requireAegisApiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const configuredToken = process.env.AEGIS_API_TOKEN?.trim();
+  const authHeader = req.header("authorization") || "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/);
+
+  if (!configuredToken || !match || !tokenMatches(configuredToken, match[1])) {
+    return res.status(401).json({
+      error: "Unauthorized",
+      reason: "AEGIS_API_AUTH_REQUIRED",
+    });
+  }
+
+  return next();
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -60,7 +82,7 @@ async function startServer() {
     res.json(getAegisStatus(globalLedger.getEvents()));
   });
 
-  app.get("/api/aegis/policy", (req, res) => {
+  app.get("/api/aegis/policy", requireAegisApiAccess, (req, res) => {
     res.json(getPolicyInfo());
   });
 
@@ -69,6 +91,8 @@ async function startServer() {
   });
 
   // Expose Ledger APIs
+  app.use("/api/agent", requireAegisApiAccess);
+
   app.get("/api/agent/ledger", (req, res) => {
     res.json(globalLedger.getEvents());
   });

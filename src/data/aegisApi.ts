@@ -3,6 +3,7 @@ import { EVENTS, INVESTIGATION } from "./fixtures.js";
 export const API_BASE = "";
 
 export const TIMEOUT_MS = 15000;
+const CONTRACT_ID = "tc_devfix_dependency_remediation_v1";
 
 export const ENDPOINTS = {
   invoke: () => `${API_BASE}/api/agent/invoke`,
@@ -16,6 +17,13 @@ export const ENDPOINTS = {
 
 const UNKNOWN = "UNKNOWN";
 
+function authHeaders() {
+  const token = (import.meta as any).env?.VITE_AEGIS_API_TOKEN;
+  return typeof token === "string" && token.trim()
+    ? { Authorization: `Bearer ${token.trim()}` }
+    : {};
+}
+
 async function request(url: string, options?: RequestInit) {
   if (typeof fetch !== "function") {
     return { ok: false, error: "fetch unavailable in this environment" };
@@ -24,13 +32,19 @@ async function request(url: string, options?: RequestInit) {
   const timer = controller ? setTimeout(() => controller.abort(), TIMEOUT_MS) : null;
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json" },
       ...(options || {}),
+      headers: { Accept: "application/json", ...authHeaders(), ...(options?.headers || {}) },
       ...(controller ? { signal: controller.signal } : {}),
     });
     const parsedData = await res.json().catch(() => null);
     if (!res.ok) {
-      return { ok: false, error: `HTTP ${res.status}`, status: res.status, data: parsedData };
+      return {
+        ok: false,
+        error: res.status === 401 ? "authentication required" : `HTTP ${res.status}`,
+        authRequired: res.status === 401,
+        status: res.status,
+        data: parsedData,
+      };
     }
     return { ok: true, status: res.status, data: parsedData };
   } catch (e: any) {
@@ -93,6 +107,14 @@ function extractEvents(data: any) {
   return mapped.length ? mapped : null;
 }
 
+function authRequiredResult(reason: string) {
+  return {
+    source: "UNAVAILABLE",
+    reason,
+    authRequired: true,
+  };
+}
+
 export const aegisApi = {
   async getLedger() {
     const r = await request(ENDPOINTS.ledger());
@@ -101,6 +123,7 @@ export const aegisApi = {
       if (events) return { source: "LOCAL", events };
       return { source: "FIXTURE", events: EVENTS, reason: "response contained no recognisable events" };
     }
+    if ((r as any).authRequired) return { ...authRequiredResult(r.error), events: [] };
     return { source: "FIXTURE", events: EVENTS, reason: r.error };
   },
 
@@ -115,6 +138,7 @@ export const aegisApi = {
         total: typeof d.total === "number" ? d.total : (d.links && d.links.total),
       };
     }
+    if ((r as any).authRequired) return { ...authRequiredResult(r.error), verified: false, ok: 0, total: 0 };
     return { source: "FIXTURE", verified: true, ok: EVENTS.length, total: EVENTS.length, reason: r.error };
   },
 
@@ -143,6 +167,20 @@ export const aegisApi = {
         },
       };
     }
+    if ((r as any).authRequired) {
+      return {
+        ...authRequiredResult(r.error),
+        status: "failed",
+        error: r.error,
+        analysis: {
+          generatedBy: "UNAVAILABLE",
+          whatHappened: ["Authentication is required before protected evidence can be investigated."],
+          refs: [],
+          basis: [],
+          notAsserted: ["No fixture or simulated Bedrock result is shown for an authentication failure."],
+        },
+      };
+    }
     return { source: "FIXTURE", analysis: INVESTIGATION, reason: r.error };
   },
 
@@ -166,6 +204,16 @@ export const aegisApi = {
   async getPolicy() {
     const r = await request(ENDPOINTS.policy());
     if (r.ok && r.data) return { source: "LOCAL", ...r.data };
+    if ((r as any).authRequired) {
+      return {
+        ...authRequiredResult(r.error),
+        file: "policy unavailable",
+        hashAlgorithm: "SHA-256",
+        hash: "",
+        sourceText: "",
+        note: "Authentication is required before policy source can be read.",
+      };
+    }
     return {
       source: "FIXTURE",
       reason: r.error,
@@ -189,6 +237,7 @@ export const aegisApi = {
       body = {
         sessionId: "sess_ui_" + Date.now(),
         agentId: "DevFix",
+        contractId: CONTRACT_ID,
         tool: toolOrBody,
         action: action || "fs:read",
         resource: resource || "package.json",
@@ -212,7 +261,7 @@ export const aegisApi = {
       payload.executionState ||
       (decision?.decision === "DENY" ? "NOT_EXECUTED" : UNKNOWN);
     return {
-      source: "LOCAL",
+      source: r.status === 401 ? "UNAVAILABLE" : "LOCAL",
       status: r.status || (r.ok ? 200 : 500),
       ok: r.ok,
       result: payload.result,

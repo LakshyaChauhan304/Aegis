@@ -1,7 +1,10 @@
 import crypto from "crypto";
+import { authFetch, authHeaders } from "./test-auth.ts";
 
 async function json(path: string, init?: RequestInit) {
-  const res = await fetch(`http://localhost:3000${path}`, init);
+  const res = path.startsWith("/api/aegis/status") || path.startsWith("/api/aegis/capabilities")
+    ? await fetch(`http://localhost:3000${path}`, init)
+    : await authFetch(path, init);
   const data = await res.json();
   return { res, data };
 }
@@ -40,7 +43,7 @@ async function testPhase7TruthBoundary() {
   console.log("\n3. Verifying unsupported shell execution does not run as a hero shortcut...");
   const shell = await json("/api/agent/invoke", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       sessionId: "sess_truth_" + Date.now(),
       agentId: "DevFix",
@@ -59,7 +62,7 @@ async function testPhase7TruthBoundary() {
   console.log("\n4. Verifying DENY still blocks protected filesystem execution and omits Bedrock...");
   const deny = await json("/api/agent/invoke", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       sessionId: "sess_truth_" + Date.now(),
       agentId: "DevFix",
