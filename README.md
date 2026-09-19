@@ -19,6 +19,7 @@ Current implementation boundaries:
 - EventBridge is currently a publisher only; no EventBridge consumer or event-driven archival pipeline is implemented.
 - Bedrock is post-hoc only. `BEDROCK_MODEL_ID` is required to select the model/inference profile; no hardcoded model fallback is used. Live invocation currently requires account-level Bedrock model access/use-case approval.
 - Trusted local Task Contract enforcement is implemented through a backend registry resolved by `contractId`. The backend normalizes tool/action/resource/argument metadata before Cedar/AVP authorization and records the normalized operation identity in evidence. KMS, cryptographic signed Task Contract verification, HMAC/session tokens, shell execution, network enforcement, container isolation, API Gateway, and Lambda are not implemented in this repository.
+- Protected execution is dispatched through a static backend executor registry after authorization. The only registered executor is `fs:fs:read`; npm, git, shell, network, and MCP execution remain unimplemented.
 
 ---
 
@@ -129,7 +130,7 @@ Existing security systems fail to solve this:
 | **03** | `fs.read` | `node_modules/axios/README.md` | `UNTRUSTED_EXTERNAL` | **ALLOW** | measured locally | 200 OK — untrusted provenance recorded |
 | **04** | `fs.read` | `.env` | `UNTRUSTED_EXTERNAL` | **DENY** | measured locally | **HTTP 403 Forbidden — blocked; 0 returned bytes** |
 
-`npm audit` and arbitrary shell execution are not supported by the current runtime tool path. Normalized argument presence/hash metadata exists for authorization evidence, but npm, git, shell, network, MCP, and arbitrary argument execution remain target/demo context only.
+`npm audit` and arbitrary shell execution are not supported by the current runtime tool path. Normalized argument presence/hash metadata exists for authorization evidence, and a static executor registry dispatches the current `fs:read` operation only. npm, git, shell, network, MCP, and arbitrary argument execution remain target/demo context only.
 
 ---
 

@@ -14,6 +14,7 @@ Current checkpoint before Phase 4A changes: `bb50229`.
 | Network enforcement | NOT IMPLEMENTED | NOT APPLICABLE | No network tool exists |
 | Trusted local Task Contract enforcement | IMPLEMENTED | VERIFIED BY TEST | `contractId` resolves against backend registry before Cedar/AVP authorization |
 | Normalized authorization request | IMPLEMENTED | VERIFIED BY TEST | Backend normalizes principal/session/contract/tool/action/resource/argument metadata before Cedar/AVP authorization |
+| Static tool executor registry | IMPLEMENTED | VERIFIED BY TEST | Registry contains only `fs:fs:read`; authorization still occurs before executor lookup |
 | Argument execution | NOT IMPLEMENTED | VERIFIED UNAVAILABLE | Arguments are represented by presence/redaction/hash metadata; unexpected current `fs:read` arguments fail closed |
 | Signed/KMS Task Contract verification | NOT IMPLEMENTED | NOT APPLICABLE | No cryptographic signature, HMAC, or KMS verification is implemented |
 | KMS-backed signing | NOT IMPLEMENTED | NOT APPLICABLE | KMS is not used by runtime code |
