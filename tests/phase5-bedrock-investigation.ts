@@ -268,7 +268,11 @@ function testIdentifierBoundary() {
 
 function testInvalidChainStatus() {
   const { ledger, target } = buildLedgerWithSession();
-  target.bytesReturned = 1;
+  const tamperedEvents = ledger.getEvents();
+  const tamperedTarget = tamperedEvents.find((event) => event.eventId === target.eventId);
+  assert(tamperedTarget, "Could not find target event for invalid-chain test");
+  tamperedTarget.bytesReturned = 1;
+  (ledger as any).events = tamperedEvents;
   const envelope = buildGroundingEnvelope(target.eventId, { ledger });
   assert(envelope.chainVerification.status === "INVALID", "Invalid hash chain was not reported");
 }

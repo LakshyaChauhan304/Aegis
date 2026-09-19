@@ -111,6 +111,29 @@ export function computeHash(event: Omit<EvidenceEvent, 'hash'> | EvidenceEvent):
   return crypto.createHash('sha256').update(canonicalize(event)).digest('hex');
 }
 
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  const objectValue = value as object;
+  if (seen.has(objectValue)) {
+    return value;
+  }
+  seen.add(objectValue);
+
+  for (const key of Reflect.ownKeys(objectValue)) {
+    const nested = (objectValue as Record<PropertyKey, unknown>)[key];
+    deepFreeze(nested, seen);
+  }
+
+  return Object.freeze(value);
+}
+
 /**
  * The Ledger maintains the cryptographically linked SHA-256 hash chain of evidence events.
  */
@@ -131,21 +154,23 @@ export class Ledger {
 
     const hash = computeHash(unhashedEvent);
     const fullEvent: EvidenceEvent = { ...unhashedEvent, hash };
-    this.events.push(fullEvent);
+    const storedEvent = deepFreeze(deepClone(fullEvent));
+    this.events.push(storedEvent);
 
-    return fullEvent;
+    return deepClone(storedEvent);
   }
 
   public getEvents(): EvidenceEvent[] {
-    return this.events;
+    return deepClone(this.events);
   }
 
   public getEvent(eventId: string): EvidenceEvent | undefined {
-    return this.events.find((event) => event.eventId === eventId);
+    const event = this.events.find((event) => event.eventId === eventId);
+    return event ? deepClone(event) : undefined;
   }
 
   public getSessionEvents(sessionId: string): EvidenceEvent[] {
-    return this.events.filter((event) => event.sessionId === sessionId);
+    return deepClone(this.events.filter((event) => event.sessionId === sessionId));
   }
 
   public verifyChain(): boolean {
