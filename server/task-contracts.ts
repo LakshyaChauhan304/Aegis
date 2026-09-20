@@ -109,6 +109,7 @@ const devfixContractDefinition: ContractDefinition = {
     allowedExact: ["test-sess", "timeout-test"],
     allowedPrefixes: [
       "sess_ui_",
+      "sess_devfix_",
       "sess_test_",
       "sess_aws_test_",
       "sess_bedrock_test_",

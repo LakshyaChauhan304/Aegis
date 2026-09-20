@@ -6,6 +6,7 @@ export const TIMEOUT_MS = 2500;
 export const ENDPOINTS = {
   health: () => `${API_BASE}/api/health`,
   invoke: () => `${API_BASE}/api/agent/invoke`,
+  devfixRun: () => `${API_BASE}/api/devfix/run`,
   ledger: () => `${API_BASE}/api/agent/ledger`,
   verify: () => `${API_BASE}/api/agent/ledger/verify`,
   investigate: (eventId: string) => `${API_BASE}/api/agent/investigate/${encodeURIComponent(eventId)}`,
@@ -276,6 +277,16 @@ export const aegisApi = {
       archivalStatus: decision?.archivalStatus || null,
       ...(authRequired(r) ? { authRequired: true } : {}),
     };
+  },
+
+  async runDevFix(contractId = "tc_devfix_dependency_remediation_v1") {
+    const r = await request(ENDPOINTS.devfixRun(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ contractId }),
+    });
+    if (r.ok && r.data) return { source: "LOCAL", ...r.data };
+    return unavailable(r, { sessionId: null, agentId: "DevFix", contractId, status: "UNAVAILABLE", steps: [] });
   },
 };
 

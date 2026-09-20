@@ -42,20 +42,11 @@ export default function Execution({ events, idx, go, select, refresh }: any) {
   const runLiveHeroFlow = async () => {
     setRunningHero(true);
     setHeroResults([]);
-    const steps = [
-      { label: "package.json", resource: "package.json", trust: "TRUSTED" },
-      { label: "package-lock.json", resource: "package-lock.json", trust: "TRUSTED" },
-      { label: "axios README", resource: "node_modules/axios/README.md", trust: "UNTRUSTED_EXTERNAL" },
-      { label: ".env", resource: ".env", trust: "UNTRUSTED_EXTERNAL" },
-    ];
     try {
-      for (let i = 0; i < steps.length; i += 1) {
-        const step = steps[i];
-        setHeroStatus(`Step ${i + 1}/4: ${step.label}`);
-        const response = await aegisApi.invoke("fs", "fs:read", step.resource, step.trust);
-        setHeroResults((prev) => [...prev, { ...step, ...response }]);
-        if (refresh) await refresh();
-      }
+      setHeroStatus("Running DevFix reference loop through Aegis...");
+      const response = await aegisApi.runDevFix();
+      setHeroResults(Array.isArray(response.steps) ? response.steps : []);
+      if (refresh) await refresh();
       setHeroStatus("Hero flow complete. Recorded proof is available in Decisions, Evidence, Lineage, Replay, and Investigations.");
     } catch (e: any) {
       setHeroStatus(`Execution error: ${e.message}`);
@@ -126,9 +117,12 @@ export default function Execution({ events, idx, go, select, refresh }: any) {
       {(heroStatus || heroResults.length > 0) ? (
         <section className="hero-run-strip">
           <strong>{heroStatus}</strong>
-          {heroResults.length > 0 ? (
-            <span>{heroResults.length} live PEP request{heroResults.length === 1 ? "" : "s"} recorded</span>
-          ) : null}
+          {heroResults.length > 0 ? <span>{heroResults.length} live PEP request{heroResults.length === 1 ? "" : "s"} recorded</span> : null}
+          {heroResults.map((step: any) => (
+            <span key={step.eventId} className="mono">
+              {step.resource} · {step.decision} · {step.executionState} · {step.bytes} bytes · {step.trust}
+            </span>
+          ))}
         </section>
       ) : null}
 
