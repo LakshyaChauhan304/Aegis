@@ -52,6 +52,17 @@ export function getLastArchivalResults() {
   return lastArchivalResults;
 }
 
+function safeAwsError(err: any): string {
+  const message = String(err?.message || err || "AWS archival failed");
+  if (message.includes("timed out")) return message;
+  if (message.includes("credentials") || message.includes("Could not load credentials")) return "AWS_CREDENTIALS_UNAVAILABLE";
+  if (message.includes("AccessDenied")) return "AWS_ACCESS_DENIED";
+  if (message.includes("InvalidSignature") || message.includes("UnrecognizedClient")) return "AWS_AUTHENTICATION_FAILED";
+  if (message.includes("NoSuchBucket")) return "S3_BUCKET_UNAVAILABLE";
+  if (message.includes("ResourceNotFound")) return "AWS_RESOURCE_NOT_FOUND";
+  return "AWS_ARCHIVAL_UNAVAILABLE";
+}
+
 export async function archiveToAWS(event: EvidenceEvent): Promise<ArchivalResults> {
   const results: ArchivalResults = {
     eventBridge: { status: "pending" },
@@ -81,7 +92,7 @@ export async function archiveToAWS(event: EvidenceEvent): Promise<ArchivalResult
     results.eventBridge.eventId = entry?.EventId;
   } catch (e: any) {
     results.eventBridge.status = "failed";
-    results.eventBridge.error = e.message;
+    results.eventBridge.error = safeAwsError(e);
   }
 
   // 2. DynamoDB (Persistence)
@@ -97,7 +108,7 @@ export async function archiveToAWS(event: EvidenceEvent): Promise<ArchivalResult
     results.dynamoDb.status = "success";
   } catch (e: any) {
     results.dynamoDb.status = "failed";
-    results.dynamoDb.error = e.message;
+    results.dynamoDb.error = safeAwsError(e);
   }
 
   // 3. S3 Object Lock (Immutable Archival in Compliance Mode)
@@ -121,7 +132,7 @@ export async function archiveToAWS(event: EvidenceEvent): Promise<ArchivalResult
     results.s3.status = "success";
   } catch (e: any) {
     results.s3.status = "failed";
-    results.s3.error = e.message;
+    results.s3.error = safeAwsError(e);
   }
 
   lastArchivalResults = results;

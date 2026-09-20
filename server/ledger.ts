@@ -1,28 +1,79 @@
 import crypto from 'crypto';
+import { ContractValidationStatus } from './task-contracts.js';
+
+export type EvidenceEventType = "AUTHORIZATION_EXECUTION" | "ARCHIVAL_RECEIPT";
+export type ExecutionState = "EXECUTED" | "NOT_EXECUTED" | "FAILED";
+export type ArchivalEvidenceStatus = "ARCHIVAL_SUCCESS" | "ARCHIVAL_PARTIAL" | "ARCHIVAL_FAILED";
+
+export interface ExecutionEvidence {
+  state: ExecutionState;
+  statusCode: number;
+  bytesReturned: number;
+  executorKey?: string;
+  reason?: string;
+}
+
+export interface ArchivalEvidence {
+  status: ArchivalEvidenceStatus;
+  sinks: {
+    eventBridge: "success" | "failed" | "pending";
+    dynamoDb: "success" | "failed" | "pending";
+    s3: "success" | "failed" | "pending";
+  };
+  eventBridgeEventId?: string;
+  failures?: {
+    eventBridge?: string;
+    dynamoDb?: string;
+    s3?: string;
+  };
+}
 
 export interface EvidenceEvent {
+  eventType: EvidenceEventType;
   eventId: string;
   timestamp: string;
   sessionId: string;
-  agentId: string;
-  action: string;
-  resource: string;
-  context: Record<string, any>;
-  decision: "ALLOW" | "DENY";
-  reason: string;
-  authorization: {
+  agentId?: string;
+  contractId?: string;
+  contractVersion?: string;
+  contractHash?: string;
+  contractValidation?: {
+    status: ContractValidationStatus;
+    valid: boolean;
+    reason?: string;
+  };
+  tool?: string;
+  normalizedAction?: string;
+  resourceType?: string;
+  resourceId?: string;
+  argumentsHash?: string;
+  argumentsPresent?: boolean;
+  argumentsRedacted?: boolean;
+  action?: string;
+  resource?: string;
+  context?: Record<string, any>;
+  decision?: "ALLOW" | "DENY";
+  reason?: string;
+  authorization?: {
     provider: string; // 'local-cedar' | 'amazon-verified-permissions'
     policyStoreId?: string;
     error?: string;
   };
+  executionState?: ExecutionState;
+  httpStatus?: number;
+  bytesReturned?: number;
+  executorKey?: string;
+  execution?: ExecutionEvidence;
+  originalEventId?: string;
+  originalEventHash?: string;
+  archival?: ArchivalEvidence;
   previousHash: string;
   hash: string;
 }
 
 /**
- * Recursively sorts object keys to ensure mathematically identical 
- * JSON representations for structurally identical objects, regardless 
- * of insertion order.
+ * Recursively sorts object keys to ensure identical JSON representations for
+ * structurally identical objects, regardless of insertion order.
  */
 function sortKeysRecursive(obj: any): any {
   if (obj === null || typeof obj !== 'object') {
@@ -46,10 +97,10 @@ function sortKeysRecursive(obj: any): any {
 export function canonicalize(event: Omit<EvidenceEvent, 'hash'> | EvidenceEvent): string {
   // Extract hash so it's not included in its own digest
   const { hash, ...unhashed } = event as EvidenceEvent;
-  
+
   // Recursively sort all nested keys to ensure absolute determinism
   const sorted = sortKeysRecursive(unhashed);
-  
+
   return JSON.stringify(sorted);
 }
 
@@ -58,6 +109,29 @@ export function canonicalize(event: Omit<EvidenceEvent, 'hash'> | EvidenceEvent)
  */
 export function computeHash(event: Omit<EvidenceEvent, 'hash'> | EvidenceEvent): string {
   return crypto.createHash('sha256').update(canonicalize(event)).digest('hex');
+}
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  const objectValue = value as object;
+  if (seen.has(objectValue)) {
+    return value;
+  }
+  seen.add(objectValue);
+
+  for (const key of Reflect.ownKeys(objectValue)) {
+    const nested = (objectValue as Record<PropertyKey, unknown>)[key];
+    deepFreeze(nested, seen);
+  }
+
+  return Object.freeze(value);
 }
 
 /**
@@ -80,13 +154,23 @@ export class Ledger {
 
     const hash = computeHash(unhashedEvent);
     const fullEvent: EvidenceEvent = { ...unhashedEvent, hash };
-    this.events.push(fullEvent);
-    
-    return fullEvent;
+    const storedEvent = deepFreeze(deepClone(fullEvent));
+    this.events.push(storedEvent);
+
+    return deepClone(storedEvent);
   }
 
   public getEvents(): EvidenceEvent[] {
-    return this.events;
+    return deepClone(this.events);
+  }
+
+  public getEvent(eventId: string): EvidenceEvent | undefined {
+    const event = this.events.find((event) => event.eventId === eventId);
+    return event ? deepClone(event) : undefined;
+  }
+
+  public getSessionEvents(sessionId: string): EvidenceEvent[] {
+    return deepClone(this.events.filter((event) => event.sessionId === sessionId));
   }
 
   public verifyChain(): boolean {

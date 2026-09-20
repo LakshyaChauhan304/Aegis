@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { authHeaders } from "./test-auth.ts";
 
 async function testPhase4() {
   console.log("=== PHASE 4: AWS EVENTBRIDGE, DYNAMODB, & S3 ARCHIVAL TEST ===");
@@ -6,10 +7,11 @@ async function testPhase4() {
   async function invoke(tool: string, action: string, resource: string, trust: string) {
     const res = await fetch("http://localhost:3000/api/agent/invoke", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         sessionId: "sess_aws_test_" + Date.now(),
-        agentId: "DevFix_Test",
+        agentId: "DevFix",
+        contractId: "tc_devfix_dependency_remediation_v1",
         tool,
         resource,
         action,
@@ -59,7 +61,7 @@ async function testPhase4() {
   reportArchival("S3 Object Lock", status.s3);
   console.log("\n3. Testing Secret Exclusion in the Evidence Ledger...");
   
-  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger");
+  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger", { headers: authHeaders() });
   const ledger = await ledgerRes.json();
   
   // Find the event we just generated

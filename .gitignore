@@ -8,6 +8,7 @@ dist/
 build/
 out/
 server.js
+.vercel/
 
 # Environment and Secrets
 .env*

@@ -1,10 +1,10 @@
-import { EVENTS, INVESTIGATION } from "./fixtures.js";
-
-export const API_BASE = "";
+const configuredApiBase = (import.meta as any).env?.VITE_AEGIS_API_BASE;
+export const API_BASE = typeof configuredApiBase === "string" ? configuredApiBase.replace(/\/$/, "") : "";
 
 export const TIMEOUT_MS = 2500;
 
 export const ENDPOINTS = {
+  health: () => `${API_BASE}/api/health`,
   invoke: () => `${API_BASE}/api/agent/invoke`,
   ledger: () => `${API_BASE}/api/agent/ledger`,
   verify: () => `${API_BASE}/api/agent/ledger/verify`,
@@ -12,9 +12,26 @@ export const ENDPOINTS = {
   status: () => `${API_BASE}/api/aegis/status`,
   policy: () => `${API_BASE}/api/aegis/policy`,
   capabilities: () => `${API_BASE}/api/aegis/capabilities`,
+  reconstruct: (sessionId: string) => `${API_BASE}/api/agent/sessions/${encodeURIComponent(sessionId)}/reconstruct`,
 };
 
 const UNKNOWN = "UNKNOWN";
+
+function authRequired(response: { status?: number }) {
+  return response.status === 401 || response.status === 403;
+}
+
+function unavailable<T extends Record<string, any> = Record<string, never>>(
+  r: { error?: string; status?: number },
+  extra: T = {} as T,
+): { source: "UNAVAILABLE"; reason?: string; authRequired: boolean } & T {
+  return {
+    source: "UNAVAILABLE",
+    reason: r.error,
+    authRequired: authRequired(r),
+    ...extra,
+  };
+}
 
 async function request(url: string, options?: RequestInit) {
   if (typeof fetch !== "function") {
@@ -98,10 +115,9 @@ export const aegisApi = {
     const r = await request(ENDPOINTS.ledger());
     if (r.ok) {
       const events = extractEvents(r.data);
-      if (events) return { source: "LOCAL", events };
-      return { source: "FIXTURE", events: EVENTS, reason: "response contained no recognisable events" };
+      return { source: "LOCAL", events: events || [] };
     }
-    return { source: "FIXTURE", events: EVENTS, reason: r.error };
+    return unavailable(r, { events: [] });
   },
 
   async verifyChain() {
@@ -115,7 +131,7 @@ export const aegisApi = {
         total: typeof d.total === "number" ? d.total : (d.links && d.links.total),
       };
     }
-    return { source: "FIXTURE", verified: true, ok: EVENTS.length, total: EVENTS.length, reason: r.error };
+    return unavailable(r, { verified: false, ok: 0, total: 0 });
   },
 
   async investigate(eventId: string) {
@@ -143,22 +159,41 @@ export const aegisApi = {
         },
       };
     }
-    return { source: "FIXTURE", analysis: INVESTIGATION, reason: r.error };
+    if (!r.ok) {
+      return {
+        ...unavailable(r),
+        status: "failed",
+        error: r.error,
+        analysis: {
+          generatedBy: "Unavailable",
+          whatHappened: [authRequired(r) ? "Authentication is required to investigate this event." : "Investigation backend is unavailable."],
+          refs: [],
+          basis: [],
+          notAsserted: [],
+        },
+      };
+    }
+    return unavailable(r, { status: "failed", analysis: { generatedBy: "Unavailable", whatHappened: [], refs: [], basis: [], notAsserted: [] } });
+  },
+
+  async getHealth() {
+    const r = await request(ENDPOINTS.health());
+    if (r.ok && r.data) return { source: "LOCAL", ...r.data };
+    return unavailable(r, { status: "unavailable" });
   },
 
   async getStatus() {
     const r = await request(ENDPOINTS.status());
     if (r.ok && r.data) return { source: "LOCAL", ...r.data };
     return {
-      source: "FIXTURE",
-      reason: r.error,
+      ...unavailable(r),
       aws: [],
       securityCore: {
         pep: "UNAVAILABLE",
         cedar: "UNAVAILABLE",
-        ledger: "FIXTURE",
+        ledger: "UNAVAILABLE",
         protectedExecution: "UNAVAILABLE",
-        note: "Backend status endpoint is unavailable; showing only explicitly labeled fallback UI.",
+        note: "Backend status endpoint is unavailable; no protected status data is shown.",
       },
     };
   },
@@ -166,21 +201,28 @@ export const aegisApi = {
   async getPolicy() {
     const r = await request(ENDPOINTS.policy());
     if (r.ok && r.data) return { source: "LOCAL", ...r.data };
-    return {
-      source: "FIXTURE",
-      reason: r.error,
-      file: "fixture policy unavailable",
-      hashAlgorithm: "SHA-256",
-      hash: "",
-      sourceText: "",
-      note: "Backend policy endpoint is unavailable. Fixture policy text is not shown as authoritative.",
-    };
+    if (!r.ok) {
+      return {
+        ...unavailable(r),
+        file: "policy unavailable",
+        hashAlgorithm: "SHA-256",
+        hash: "",
+        sourceText: "",
+      };
+    }
+    return unavailable(r, { file: "policy unavailable", hashAlgorithm: "SHA-256", hash: "", sourceText: "" });
   },
 
   async getCapabilities() {
     const r = await request(ENDPOINTS.capabilities());
     if (r.ok && r.data) return { source: "LOCAL", ...r.data };
-    return { source: "FIXTURE", reason: r.error, runtimeTools: [] };
+    return unavailable(r, { runtimeTools: [] });
+  },
+
+  async reconstruct(sessionId: string) {
+    const r = await request(ENDPOINTS.reconstruct(sessionId));
+    if (r.ok && r.data) return { source: "LOCAL", ...r.data };
+    return unavailable(r, { sessionId, events: [], verification: { valid: false, scope: "unavailable", eventCount: 0 } });
   },
 
   async invoke(toolOrBody: any, action?: string, resource?: string, trust?: string): Promise<any> {
@@ -189,6 +231,7 @@ export const aegisApi = {
       body = {
         sessionId: "sess_ui_" + Date.now(),
         agentId: "DevFix",
+        contractId: "tc_devfix_dependency_remediation_v1",
         tool: toolOrBody,
         action: action || "fs:read",
         resource: resource || "package.json",
@@ -215,7 +258,7 @@ export const aegisApi = {
       payload.executionState ||
       (decision?.decision === "DENY" ? "NOT_EXECUTED" : resultText != null ? "EXECUTED" : UNKNOWN);
     return {
-      source: "LOCAL",
+      source: r.ok ? "LOCAL" : "UNAVAILABLE",
       status: r.status || (r.ok ? 200 : 500),
       ok: r.ok,
       result: resultText,
@@ -231,6 +274,7 @@ export const aegisApi = {
       executionState,
       bytesReturned: byteCount,
       archivalStatus: decision?.archivalStatus || null,
+      ...(authRequired(r) ? { authRequired: true } : {}),
     };
   },
 };
