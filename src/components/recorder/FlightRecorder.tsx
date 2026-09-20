@@ -66,7 +66,7 @@ export default function FlightRecorder({ events, idx, setIdx, select, go, source
           </div>
           <div>
             <span>REPLAY SOURCE</span>
-            <strong className="mono">FRONTEND-DERIVED EVENT ORDER</strong>
+            <strong className="mono">{source === "LIVE" ? "BACKEND-RECORDED EVENT ORDER" : "FRONTEND-DERIVED EVENT ORDER"}</strong>
           </div>
         </div>
         <div className="replay-strip-actions">

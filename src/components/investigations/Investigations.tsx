@@ -48,7 +48,7 @@ export default function Investigations({ events, analysis, analysisSource, setAn
           </div>
           <div>
             <div className="mono dim" style={{ fontSize: 9.5, letterSpacing: ".12em" }}>SESSION</div>
-            <div className="mono" style={{ fontSize: 13, marginTop: 2 }}>{SESSION.id}</div>
+            <div className="mono" style={{ fontSize: 13, marginTop: 2 }}>{targetEvent?.sessionId || "NO_SESSION_RECORDED"}</div>
           </div>
           <div>
             <div className="mono dim" style={{ fontSize: 9.5, letterSpacing: ".12em" }}>EVIDENCE LEDGER</div>

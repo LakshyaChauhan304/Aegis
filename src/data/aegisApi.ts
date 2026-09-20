@@ -72,12 +72,14 @@ export function normaliseEvent(raw: any, index: number, firstTimestampMs: number
   if (!raw || typeof raw !== "object") return null;
   const authorization = raw.authorization && typeof raw.authorization === "object" ? raw.authorization : {};
   return {
+    eventType: raw.eventType || "AUTHORIZATION_EXECUTION",
     seq: raw.seq != null ? raw.seq : index + 1,
     id: raw.id || raw.eventId || `evt_${index}`,
     eventId: raw.eventId || raw.id || `evt_${index}`,
     timestamp: raw.timestamp || null,
     sessionId: raw.sessionId || null,
     agentId: raw.agentId || null,
+    contractId: raw.contractId || null,
     t: elapsedSeconds(raw, firstTimestampMs),
     tool: raw.tool || raw.action || "",
     action: raw.action || "",
@@ -167,7 +169,7 @@ export const aegisApi = {
         error: r.error,
         analysis: {
           generatedBy: "Unavailable",
-          whatHappened: [authRequired(r) ? "Authentication is required to investigate this event." : "Investigation backend is unavailable."],
+          whatHappened: [authRequired(r) ? "Authentication is required to investigate this event." : (r.data?.error || r.data?.reason || r.error || "Investigation backend is unavailable.")],
           refs: [],
           basis: [],
           notAsserted: [],

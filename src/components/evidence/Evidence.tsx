@@ -121,7 +121,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
               ["TIMESTAMP", ev.timestamp || SESSION.startedAt.slice(0, 11) + "09:14:" + (20 + ev.t).toFixed(3) + "Z"],
               ["SESSION", ev.sessionId || (source === "FIXTURE" ? SESSION.id : "UNAVAILABLE")],
               ["AGENT", ev.agentId || (source === "FIXTURE" ? SESSION.agentId : "UNAVAILABLE")],
-              ["CONTRACT", source === "FIXTURE" ? SESSION.contractId : "NOT RECORDED"],
+              ["CONTRACT", ev.contractId || (source === "FIXTURE" ? SESSION.contractId : "NOT RECORDED")],
               ["TOOL", ev.tool],
               ["RESOURCE", ev.resource],
               ["CONTEXT", <TrustChip t={ev.trust} />],

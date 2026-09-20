@@ -12,7 +12,7 @@ import { eventTraceId } from "../../data/controlPlane.ts";
 
 export default function Decisions({ events, selected, select, go }: any) {
   const ev = events.find((e: any) => e.id === selected) || events[events.length - 1];
-  const contractLabel = ev.sessionId ? "NOT AVAILABLE" : SESSION.contractId;
+  const contractLabel = ev?.contractId || (ev?.sessionId ? "NOT AVAILABLE" : SESSION.contractId);
 
   return (
     <>
@@ -74,7 +74,7 @@ export default function Decisions({ events, selected, select, go }: any) {
           <KV
             rows={[
               ["TRACE ID", eventTraceId(ev)],
-              ["WHO", `${SESSION.agentName} (Agent::"${ev.agentId || SESSION.agentId}")`],
+              ["WHO", `${ev.agentId ? "DevFix" : SESSION.agentName} (Agent::"${ev.agentId || SESSION.agentId}")`],
               ["SESSION", ev.sessionId || SESSION.id],
               ["WHAT", ev.action],
               ["RESOURCE", ev.resource],

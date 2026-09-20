@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import PageHead from "../shared/PageHead.tsx";
 import Panel from "../shared/Panel.tsx";
 import StateChip from "../shared/StateChip.tsx";
@@ -77,10 +77,27 @@ const INITIAL_INVARIANTS: TestResult[] = [
   },
 ];
 
-export default function SecurityTests() {
+export default function SecurityTests({ activeRun }: any) {
   const [invariants, setInvariants] = useState<TestResult[]>(INITIAL_INVARIANTS);
   const [isRunning, setIsRunning] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
+
+  useEffect(() => {
+    const events = activeRun?.events;
+    if (!Array.isArray(events) || events.length === 0) return;
+    const allow = events.find((event: any) => event.resource === "package.json" && event.decision === "ALLOW");
+    const deny = events.find((event: any) => event.resource === ".env" && event.decision === "DENY");
+    const updated = [...INITIAL_INVARIANTS];
+    if (allow) {
+      updated[0] = { ...updated[0], status: "PASSED", details: "Live DevFix evidence shows package.json was allowed and executed.", evidence: `${allow.id} · ${allow.execution || "EXECUTED"}` };
+    }
+    if (deny) {
+      updated[1] = { ...updated[1], status: deny.execution === "NOT_EXECUTED" ? "PASSED" : "FAILED", details: "Live DevFix evidence shows .env was denied before execution.", evidence: `${deny.id} · ${deny.execution}` };
+      updated[2] = { ...updated[2], status: deny.decision === "DENY" ? "PASSED" : "FAILED", details: "Live DevFix evidence records the denied request.", evidence: `${deny.id} · ${deny.http == null ? "status recorded by gateway" : `HTTP ${deny.http}`}` };
+      updated[3] = { ...updated[3], status: deny.bytes === 0 ? "PASSED" : "FAILED", details: "Live DevFix evidence records zero protected bytes returned.", evidence: `${deny.id} · ${deny.bytes} bytes`, bytesExposed: deny.bytes };
+    }
+    setInvariants(updated);
+  }, [activeRun]);
 
   const runLiveSuite = async () => {
     setIsRunning(true);

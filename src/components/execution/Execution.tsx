@@ -27,7 +27,7 @@ function InfoStrip({ items }: { items: Array<[string, React.ReactNode, string?]>
   );
 }
 
-export default function Execution({ events, idx, go, select, refresh }: any) {
+export default function Execution({ events, idx, go, select, refresh, activeRun, onDevFixRun }: any) {
   const safeEvents = Array.isArray(events) ? events : [];
   const visible = safeEvents.slice(0, idx + 1);
   const current = safeEvents[idx] || safeEvents[safeEvents.length - 1];
@@ -44,9 +44,8 @@ export default function Execution({ events, idx, go, select, refresh }: any) {
     setHeroResults([]);
     try {
       setHeroStatus("Running DevFix reference loop through Aegis...");
-      const response = await aegisApi.runDevFix();
+      const response = onDevFixRun ? await onDevFixRun() : await aegisApi.runDevFix();
       setHeroResults(Array.isArray(response.steps) ? response.steps : []);
-      if (refresh) await refresh();
       setHeroStatus("Hero flow complete. Recorded proof is available in Decisions, Evidence, Lineage, Replay, and Investigations.");
     } catch (e: any) {
       setHeroStatus(`Execution error: ${e.message}`);
@@ -66,8 +65,8 @@ export default function Execution({ events, idx, go, select, refresh }: any) {
     {
       n: "02",
       title: "TASK CONTRACT",
-      value: SESSION.contractId || "NOT AVAILABLE",
-      chip: <StateChip s={SESSION.signature || "FIXTURE"} />,
+      value: current?.contractId || activeRun?.contractId || SESSION.contractId || "NOT AVAILABLE",
+      chip: <StateChip s={activeRun ? "LIVE" : SESSION.signature || "FIXTURE"} />,
       desc: "Declared authority bounds the request.",
     },
     {
@@ -91,7 +90,7 @@ export default function Execution({ events, idx, go, select, refresh }: any) {
       chip: <DecisionChip d={current?.decision} />,
       desc: current?.decision === "DENY" ? "Executor is not reached." : "Executor is reached only after allow.",
     },
-  ]), [current]);
+  ]), [activeRun, current]);
 
   return (
     <div className="secondary-page execution-page">
@@ -128,11 +127,11 @@ export default function Execution({ events, idx, go, select, refresh }: any) {
 
       <InfoStrip
         items={[
-          ["AGENT", SESSION.agentName],
-          ["SESSION", SESSION.id],
-          ["TASK CONTRACT", SESSION.contractId],
+          ["AGENT", activeRun?.agentId || SESSION.agentName],
+          ["SESSION", activeRun?.sessionId || SESSION.id],
+          ["TASK CONTRACT", activeRun?.contractId || SESSION.contractId],
           ["AUTHORITY", "Declared Scope"],
-          ["STATE", denied ? "HALTED AT DENY" : "RUNNING", denied ? "deny" : "allow"],
+          ["STATE", activeRun?.status || (denied ? "HALTED AT DENY" : "RUNNING"), denied ? "deny" : "allow"],
         ]}
       />
 

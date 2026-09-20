@@ -59,7 +59,7 @@ function fallbackAgentId(source: SourceKind) {
 }
 
 export function buildControlPlaneSessions(events: any[] = EVENTS, source: SourceKind = "FIXTURE"): ControlPlaneSession[] {
-  const safeEvents = Array.isArray(events) && events.length ? events : EVENTS;
+  const safeEvents = Array.isArray(events) && events.length ? events : source === "FIXTURE" ? EVENTS : [];
   const isFixture = source === "FIXTURE";
   const grouped = safeEvents.reduce((acc: Record<string, any>, event: any) => {
     const sessionId = event.sessionId || fallbackSessionId(source);
@@ -67,7 +67,7 @@ export function buildControlPlaneSessions(events: any[] = EVENTS, source: Source
       acc[sessionId] = {
         id: sessionId,
         agentId: event.agentId || fallbackAgentId(source),
-        contractId: isFixture ? SESSION.contractId : "NOT AVAILABLE",
+        contractId: event.contractId || (isFixture ? SESSION.contractId : "NOT AVAILABLE"),
         startedAt: event.timestamp || (isFixture ? SESSION.startedAt : null),
         durationMs: isFixture ? SESSION.durationMs : null,
         events: [],
@@ -92,13 +92,13 @@ export function buildControlPlaneSessions(events: any[] = EVENTS, source: Source
       allowCount,
       denyCount,
       untrustedInputCount,
-      state: denyCount ? "HALTED_AT_DENY" : isFixture ? SESSION.state : "LOCAL",
+      state: denyCount ? (source === "LIVE" ? "COMPLETED" : "HALTED_AT_DENY") : isFixture ? SESSION.state : "LOCAL",
     };
   });
 }
 
 export function buildControlPlaneAgent(events: any[] = EVENTS, source: SourceKind = "FIXTURE"): ControlPlaneAgent {
-  const safeEvents = Array.isArray(events) && events.length ? events : EVENTS;
+  const safeEvents = Array.isArray(events) && events.length ? events : source === "FIXTURE" ? EVENTS : [];
   const isFixture = source === "FIXTURE";
   const sessions = buildControlPlaneSessions(safeEvents, source);
   const allowCount = safeEvents.filter((event) => event.decision === "ALLOW").length;
@@ -109,9 +109,9 @@ export function buildControlPlaneAgent(events: any[] = EVENTS, source: SourceKin
   return {
     id: agentId,
     name: isFixture ? SESSION.agentName : agentId,
-    role: isFixture ? SESSION.agentRole : "NOT AVAILABLE",
+    role: isFixture ? SESSION.agentRole : source === "LIVE" ? "Dependency Remediation Agent" : "NOT AVAILABLE",
     sessionIds: sessions.map((session) => session.id).filter((id) => id !== "UNKNOWN_SESSION"),
-    contractIds: isFixture ? [CONTRACT.id] : [],
+    contractIds: isFixture ? [CONTRACT.id] : Array.from(new Set(safeEvents.map((event) => event.contractId).filter(Boolean))),
     allowCount,
     denyCount,
     untrustedInputCount,
@@ -121,7 +121,7 @@ export function buildControlPlaneAgent(events: any[] = EVENTS, source: SourceKin
 }
 
 export function buildControlPlaneModel(events: any[] = EVENTS, source: SourceKind = "FIXTURE") {
-  const safeEvents = Array.isArray(events) && events.length ? events : EVENTS;
+  const safeEvents = Array.isArray(events) && events.length ? events : source === "FIXTURE" ? EVENTS : [];
   return {
     source,
     displaySource: controlPlaneSourceLabel(source),

@@ -34,6 +34,7 @@ export default function App() {
   });
   const [playIdx, setPlayIdx] = useState(EVENTS.length - 1);
   const [selectedEvent, selectEvent] = useState<any>(EVENTS[EVENTS.length - 1]?.id || null);
+  const [activeRun, setActiveRun] = useState<any>(null);
 
   const setRoute = (r: string) => {
     window.location.hash = r;
@@ -62,6 +63,58 @@ export default function App() {
     if (evs.length) {
       selectEvent(evs[evs.length - 1].id);
     }
+  };
+
+  const runDevFix = async () => {
+    const run = await aegisApi.runDevFix();
+    if (run.source === "UNAVAILABLE" || !run.sessionId || !Array.isArray(run.steps)) {
+      throw new Error(run.reason || "DevFix backend is unavailable");
+    }
+
+    const [ledgerRes, chainRes] = await Promise.all([
+      aegisApi.getLedger(),
+      aegisApi.verifyChain(),
+    ]);
+    const ledgerEvents = (ledgerRes.events || []).filter((event: any) =>
+      event.eventType === "AUTHORIZATION_EXECUTION" && event.sessionId === run.sessionId
+    );
+    const events = ledgerEvents.length === run.steps.length
+      ? ledgerEvents
+      : run.steps.map((step: any, index: number) => ({
+        seq: index + 1,
+        id: step.eventId,
+        eventId: step.eventId,
+        t: index,
+        tool: step.tool,
+        action: step.action,
+        resource: step.resource,
+        trust: step.trust,
+        decision: step.decision,
+        reason: step.reason || "NOT AVAILABLE",
+        execution: step.executionState,
+        bytes: step.bytes,
+        sessionId: run.sessionId,
+        agentId: run.agentId,
+        contractId: run.contractId,
+      }));
+
+    setActiveRun({ ...run, events });
+    setData({ source: "LIVE", events });
+    setChain(ledgerEvents.length === run.steps.length ? chainRes : { source: "UNAVAILABLE", verified: false, ok: null, total: null });
+    setPlayIdx(Math.max(0, events.length - 1));
+    const finalEvent = events[events.length - 1];
+    selectEvent(finalEvent?.id || null);
+    setAnalysis({
+      source: "UNAVAILABLE",
+      analysis: {
+        generatedBy: "Not run",
+        whatHappened: ["Select the recorded event and run a post-hoc investigation to invoke Bedrock."],
+        basis: [],
+        refs: [],
+        notAsserted: ["No Bedrock analysis has been run for this live run."],
+      },
+    });
+    return { ...run, events };
   };
 
   useEffect(() => {
@@ -111,7 +164,8 @@ export default function App() {
       playIdx={playIdx}
       setPlayIdx={setPlayIdx}
       selectedEvent={selectedEvent}
-      selectEvent={selectEvent}>
+      selectEvent={selectEvent}
+      activeRun={activeRun}>
       <Component
         events={data.events}
         idx={playIdx}
@@ -122,6 +176,8 @@ export default function App() {
         source={data.source}
         chain={chain}
         refresh={refreshLedger}
+        activeRun={activeRun}
+        onDevFixRun={runDevFix}
         analysis={analysis.analysis}
         analysisSource={analysis.source}
         setAnalysis={setAnalysis}
