@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AppShell from "./components/layout/AppShell.tsx";
 import Overview from "./components/overview/Overview.tsx";
 import Agents from "./components/agents/Agents.tsx";
@@ -35,6 +35,7 @@ export default function App() {
   const [playIdx, setPlayIdx] = useState(EVENTS.length - 1);
   const [selectedEvent, selectEvent] = useState<any>(EVENTS[EVENTS.length - 1]?.id || null);
   const [activeRun, setActiveRun] = useState<any>(null);
+  const liveRunGeneration = useRef(0);
 
   const setRoute = (r: string) => {
     window.location.hash = r;
@@ -66,6 +67,7 @@ export default function App() {
   };
 
   const runDevFix = async () => {
+    liveRunGeneration.current += 1;
     const run = await aegisApi.runDevFix();
     if (run.source === "UNAVAILABLE" || !run.sessionId || !Array.isArray(run.steps)) {
       throw new Error(run.reason || "DevFix backend is unavailable");
@@ -78,7 +80,9 @@ export default function App() {
     const ledgerEvents = (ledgerRes.events || []).filter((event: any) =>
       event.eventType === "AUTHORIZATION_EXECUTION" && event.sessionId === run.sessionId
     );
-    const events = ledgerEvents.length === run.steps.length
+    const hasLedgerEvidence = ledgerEvents.length === run.steps.length;
+    const evidenceSource = hasLedgerEvidence ? "LIVE" : "DERIVED";
+    const events = hasLedgerEvidence
       ? ledgerEvents
       : run.steps.map((step: any, index: number) => ({
         seq: index + 1,
@@ -98,9 +102,9 @@ export default function App() {
         contractId: run.contractId,
       }));
 
-    setActiveRun({ ...run, events });
-    setData({ source: "LIVE", events });
-    setChain(ledgerEvents.length === run.steps.length ? chainRes : { source: "UNAVAILABLE", verified: false, ok: null, total: null });
+    setActiveRun({ ...run, events, evidenceSource });
+    setData({ source: evidenceSource, events });
+    setChain(hasLedgerEvidence ? chainRes : { source: "UNAVAILABLE", verified: false, ok: null, total: null });
     setPlayIdx(Math.max(0, events.length - 1));
     const finalEvent = events[events.length - 1];
     selectEvent(finalEvent?.id || null);
@@ -119,11 +123,12 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    const requestGeneration = liveRunGeneration.current;
     Promise.all([
       aegisApi.getLedger(),
       aegisApi.verifyChain()
     ]).then(([ledgerRes, chainRes]) => {
-      if (!active) return;
+      if (!active || requestGeneration !== liveRunGeneration.current) return;
       setData(ledgerRes);
       setChain(chainRes);
       const evs = ledgerRes.events || [];

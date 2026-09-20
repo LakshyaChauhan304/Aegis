@@ -10,7 +10,7 @@ import DecisionChip from "../shared/DecisionChip.tsx";
 import TrustChip from "../shared/TrustChip.tsx";
 import { SESSION } from "../../data/fixtures.js";
 
-export default function Policies({ go, events = [], selected }: any) {
+export default function Policies({ go, events = [], selected, source }: any) {
   const [policy, setPolicy] = useState<any>(null);
   const ev = events.find((event: any) => event.id === selected) || events[events.length - 1];
 
@@ -60,7 +60,7 @@ export default function Policies({ go, events = [], selected }: any) {
         <Panel title="CURRENT REQUEST CONTEXT">
           <KV
             rows={[
-              ["PRINCIPAL", ev?.agentId || SESSION.agentId],
+              ["PRINCIPAL", ev?.agentId || (source === "FIXTURE" ? SESSION.agentId : "NOT AVAILABLE")],
               ["ACTION", ev?.action || "NOT AVAILABLE"],
               ["RESOURCE", ev?.resource || "NOT AVAILABLE"],
               ["CONTEXT / TRUST", ev ? <TrustChip t={ev.trust} /> : "NOT AVAILABLE"],

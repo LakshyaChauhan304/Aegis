@@ -27,7 +27,7 @@ export default function LineageVisual({ go, selected, select, source, events = [
   const W = 1000;
   const H = 460;
   const noRecordedEvents = source !== "FIXTURE" && (!Array.isArray(events) || events.length === 0);
-  const useLive = source === "LIVE" && Array.isArray(events) && events.length > 0;
+  const useLive = ["LIVE", "LOCAL", "DERIVED", "LIVE_VERIFIED"].includes(source) && Array.isArray(events) && events.length > 0;
   const liveNodes = buildLiveLineage(events);
   const nodes = noRecordedEvents ? [] : useLive ? liveNodes : LINEAGE_NODES;
   const edges = useLive
@@ -53,7 +53,7 @@ export default function LineageVisual({ go, selected, select, source, events = [
 
       <Panel flush>
         <div style={{ padding: "var(--s4)", borderBottom: "1px solid var(--line)", display: "flex", gap: "var(--s3)", flexWrap: "wrap", alignItems: "center" }}>
-          <Chip kind={useLive ? "info" : "ghost"}>{useLive ? "DERIVED LINEAGE" : noRecordedEvents ? "NO LIVE DATA" : "FIXTURE LINEAGE"}</Chip>
+          <Chip kind={useLive ? "info" : "ghost"}>{useLive ? (source === "DERIVED" ? "DERIVED EVENT ORDER" : "EVIDENCE LINEAGE") : noRecordedEvents ? "NO LIVE DATA" : "FIXTURE LINEAGE"}</Chip>
           <Chip kind="ghost">SOURCE / CONTEXT</Chip>
           <span className="dim" aria-hidden="true">&rarr;</span>
           <Chip kind="ghost">REQUEST</Chip>

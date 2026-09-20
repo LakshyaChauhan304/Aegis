@@ -130,7 +130,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
           <KV
             rows={[
               ["EVENT ID", ev.id],
-              ["TIMESTAMP", ev.timestamp || SESSION.startedAt.slice(0, 11) + "09:14:" + (20 + ev.t).toFixed(3) + "Z"],
+              ["TIMESTAMP", ev.timestamp || (source === "FIXTURE" ? SESSION.startedAt.slice(0, 11) + "09:14:" + (20 + ev.t).toFixed(3) + "Z" : "NOT AVAILABLE")],
               ["SESSION", ev.sessionId || (source === "FIXTURE" ? SESSION.id : "UNAVAILABLE")],
               ["AGENT", ev.agentId || (source === "FIXTURE" ? SESSION.agentId : "UNAVAILABLE")],
               ["CONTRACT", ev.contractId || (source === "FIXTURE" ? SESSION.contractId : "NOT RECORDED")],

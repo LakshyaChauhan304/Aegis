@@ -92,7 +92,7 @@ export function buildControlPlaneSessions(events: any[] = EVENTS, source: Source
       allowCount,
       denyCount,
       untrustedInputCount,
-      state: denyCount ? (source === "LIVE" ? "COMPLETED" : "HALTED_AT_DENY") : isFixture ? SESSION.state : "LOCAL",
+      state: denyCount ? (source === "LIVE" || source === "DERIVED" ? "COMPLETED" : "HALTED_AT_DENY") : isFixture ? SESSION.state : "LOCAL",
     };
   });
 }
@@ -109,7 +109,7 @@ export function buildControlPlaneAgent(events: any[] = EVENTS, source: SourceKin
   return {
     id: agentId,
     name: isFixture ? SESSION.agentName : agentId,
-    role: isFixture ? SESSION.agentRole : source === "LIVE" ? "Dependency Remediation Agent" : "NOT AVAILABLE",
+    role: isFixture ? SESSION.agentRole : source === "LIVE" || source === "DERIVED" ? "Dependency Remediation Agent" : "NOT AVAILABLE",
     sessionIds: sessions.map((session) => session.id).filter((id) => id !== "UNKNOWN_SESSION"),
     contractIds: isFixture ? [CONTRACT.id] : Array.from(new Set(safeEvents.map((event) => event.contractId).filter(Boolean))),
     allowCount,

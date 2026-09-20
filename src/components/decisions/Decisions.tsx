@@ -10,7 +10,7 @@ import EvaluationChain from "./EvaluationChain.tsx";
 import { SESSION } from "../../data/fixtures.js";
 import { eventTraceId } from "../../data/controlPlane.ts";
 
-export default function Decisions({ events, selected, select, go }: any) {
+export default function Decisions({ events, selected, select, go, source }: any) {
   const safeEvents = Array.isArray(events) ? events : [];
   const ev = safeEvents.find((e: any) => e.id === selected) || safeEvents[safeEvents.length - 1];
   const contractLabel = ev?.contractId || (ev?.sessionId ? "NOT AVAILABLE" : SESSION.contractId);
@@ -50,7 +50,7 @@ export default function Decisions({ events, selected, select, go }: any) {
                   className={"clickable" + (e.id === ev.id ? " sel" : "")}
                   onClick={() => select(e.id)}>
                   <td className="m dim">{e.t.toFixed(3)}</td>
-                  <td className="m">{e.agentId || SESSION.agentId}</td>
+                  <td className="m">{e.agentId || (source === "FIXTURE" ? SESSION.agentId : "NOT AVAILABLE")}</td>
                   <td className="m">{e.action}</td>
                   <td className="m">{e.resource}</td>
                   <td className="m">
@@ -86,8 +86,8 @@ export default function Decisions({ events, selected, select, go }: any) {
           <KV
             rows={[
               ["TRACE ID", eventTraceId(ev)],
-              ["WHO", `${ev.agentId ? "DevFix" : SESSION.agentName} (Agent::"${ev.agentId || SESSION.agentId}")`],
-              ["SESSION", ev.sessionId || SESSION.id],
+              ["WHO", `${ev.agentId || (source === "FIXTURE" ? SESSION.agentName : "NOT AVAILABLE")} (Agent::"${ev.agentId || (source === "FIXTURE" ? SESSION.agentId : "NOT AVAILABLE")}")`],
+              ["SESSION", ev.sessionId || (source === "FIXTURE" ? SESSION.id : "NOT AVAILABLE")],
               ["WHAT", ev.action],
               ["RESOURCE", ev.resource],
               ["TASK CONTRACT", contractLabel],

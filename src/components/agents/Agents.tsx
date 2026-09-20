@@ -78,7 +78,7 @@ export default function Agents({ events, go, select, source = "FIXTURE" }: any) 
                   <span className="dim"> / </span>
                   <span style={{ color: "var(--deny)" }}>{agent.denyCount} deny</span>
                 </td>
-                <td><Chip kind="info" icon="&#9679;">{source === "LIVE" ? "COMPLETED" : "ACTIVE"}</Chip></td>
+                <td><Chip kind="info" icon="&#9679;">{source === "LIVE" || source === "DERIVED" ? "COMPLETED" : "ACTIVE"}</Chip></td>
                 <td className="sticky-actions">
                   <div className="actionstack">
                   <button className="btn sm" onClick={(e) => { e.stopPropagation(); go("execution"); }}>Execution</button>{" "}
