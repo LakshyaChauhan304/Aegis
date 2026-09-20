@@ -40,6 +40,7 @@ export type RuntimeEventLike = {
   timestamp?: string | null;
   sessionId?: string | null;
   agentId?: string | null;
+  contractId?: string | null;
   action?: string;
   resource?: string;
   trust?: string;
@@ -396,11 +397,11 @@ export function buildRuntimeArchitectureInspector(
   } else if (selected === "devfix") {
     add(rows, "Agent", event?.agentId || SESSION.agentName);
     add(rows, "Session", event?.sessionId || SESSION.id);
-    add(rows, "Task", SESSION.contractId);
+    add(rows, "Task", event?.contractId || SESSION.contractId);
     add(rows, "Current state", event?.decision === "DENY" ? "HALTED_AT_DENY" : SESSION.state);
     add(rows, "Current event", eventId);
   } else if (selected === "contract") {
-    add(rows, "Contract ID", CONTRACT.id);
+    add(rows, "Contract ID", event?.contractId || CONTRACT.id);
     add(rows, "Agent", CONTRACT.agent);
     add(rows, "Purpose", CONTRACT.purpose);
     add(rows, "Filesystem scope", CONTRACT.fsAllow.join(", "));

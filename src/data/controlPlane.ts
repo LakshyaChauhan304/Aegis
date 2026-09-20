@@ -13,7 +13,7 @@ export type ControlPlaneSession = {
   denyCount: number;
   untrustedInputCount: number;
   state: string;
-  source: "FIXTURE" | "DERIVED";
+  source: "FIXTURE" | "LIVE" | "DERIVED";
 };
 
 export type ControlPlaneAgent = {
@@ -26,7 +26,7 @@ export type ControlPlaneAgent = {
   denyCount: number;
   untrustedInputCount: number;
   recentEvents: any[];
-  source: "FIXTURE" | "DERIVED";
+  source: "FIXTURE" | "LIVE" | "DERIVED";
 };
 
 export function controlPlaneSourceLabel(source: SourceKind) {
@@ -71,7 +71,7 @@ export function buildControlPlaneSessions(events: any[] = EVENTS, source: Source
         startedAt: event.timestamp || (isFixture ? SESSION.startedAt : null),
         durationMs: isFixture ? SESSION.durationMs : null,
         events: [],
-        source: isFixture ? "FIXTURE" : "DERIVED",
+        source: isFixture ? "FIXTURE" : source === "LIVE" ? "LIVE" : "DERIVED",
       };
     }
     acc[sessionId].events.push(event);
@@ -116,7 +116,7 @@ export function buildControlPlaneAgent(events: any[] = EVENTS, source: SourceKin
     denyCount,
     untrustedInputCount,
     recentEvents: safeEvents.slice(-4).reverse(),
-    source: isFixture ? "FIXTURE" : "DERIVED",
+    source: isFixture ? "FIXTURE" : source === "LIVE" ? "LIVE" : "DERIVED",
   };
 }
 

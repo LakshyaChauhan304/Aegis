@@ -64,7 +64,7 @@ export default function Policies({ go, events = [], selected }: any) {
               ["ACTION", ev?.action || "NOT AVAILABLE"],
               ["RESOURCE", ev?.resource || "NOT AVAILABLE"],
               ["CONTEXT / TRUST", ev ? <TrustChip t={ev.trust} /> : "NOT AVAILABLE"],
-              ["CONTRACT", ev?.sessionId ? "NOT AVAILABLE" : SESSION.contractId],
+              ["CONTRACT", ev?.contractId || (ev?.sessionId ? "NOT AVAILABLE" : SESSION.contractId)],
               ["CEDAR RESULT", ev ? <DecisionChip d={ev.decision} /> : "NOT AVAILABLE"],
               ["ARGUMENTS", "NOT EXPOSED BY BACKEND"],
             ]}
