@@ -26,12 +26,13 @@ function buildLiveLineage(events: any[]) {
 export default function LineageVisual({ go, selected, select, source, events = [] }: any) {
   const W = 1000;
   const H = 460;
-  const useLive = source !== "FIXTURE" && Array.isArray(events) && events.length > 0;
+  const noRecordedEvents = source !== "FIXTURE" && (!Array.isArray(events) || events.length === 0);
+  const useLive = source === "LIVE" && Array.isArray(events) && events.length > 0;
   const liveNodes = buildLiveLineage(events);
-  const nodes = useLive ? liveNodes : LINEAGE_NODES;
+  const nodes = noRecordedEvents ? [] : useLive ? liveNodes : LINEAGE_NODES;
   const edges = useLive
     ? liveNodes.slice(1).map((node, index) => [liveNodes[index].id, node.id, "hash"])
-    : LINEAGE_EDGES;
+    : noRecordedEvents ? [] : LINEAGE_EDGES;
 
   return (
     <>
@@ -39,6 +40,7 @@ export default function LineageVisual({ go, selected, select, source, events = [
         title="Evidence Lineage"
         desc={useLive
           ? "Evidence-backed lineage derived from recorded ledger events and SHA-256 linear hash-chain links."
+          : noRecordedEvents ? "NO LIVE EVENT RECORDED. Live lineage is unavailable until a backend run is recorded."
           : "Demo/fallback lineage. Live ledger relationships are unavailable."}
         actions={
           <>
@@ -51,7 +53,7 @@ export default function LineageVisual({ go, selected, select, source, events = [
 
       <Panel flush>
         <div style={{ padding: "var(--s4)", borderBottom: "1px solid var(--line)", display: "flex", gap: "var(--s3)", flexWrap: "wrap", alignItems: "center" }}>
-          <Chip kind={useLive ? "info" : "ghost"}>{useLive ? "DERIVED LINEAGE" : "FIXTURE LINEAGE"}</Chip>
+          <Chip kind={useLive ? "info" : "ghost"}>{useLive ? "DERIVED LINEAGE" : noRecordedEvents ? "NO LIVE DATA" : "FIXTURE LINEAGE"}</Chip>
           <Chip kind="ghost">SOURCE / CONTEXT</Chip>
           <span className="dim" aria-hidden="true">&rarr;</span>
           <Chip kind="ghost">REQUEST</Chip>
@@ -133,6 +135,7 @@ export default function LineageVisual({ go, selected, select, source, events = [
           <Note kind="info">
             {useLive
               ? "EVIDENCE-BACKED LINEAGE: this view uses recorded event order, trust labels, authorization provider metadata, and SHA-256 linear hash-chain links. It does not claim mathematical causality."
+              : noRecordedEvents ? "NO LIVE EVENT RECORDED: this view is intentionally empty until backend evidence exists."
               : "DEMO/FALLBACK: this fixture view is illustrative and is not represented as live backend evidence."}
           </Note>
         </div>

@@ -11,8 +11,20 @@ import { SESSION } from "../../data/fixtures.js";
 import { eventTraceId } from "../../data/controlPlane.ts";
 
 export default function Decisions({ events, selected, select, go }: any) {
-  const ev = events.find((e: any) => e.id === selected) || events[events.length - 1];
+  const safeEvents = Array.isArray(events) ? events : [];
+  const ev = safeEvents.find((e: any) => e.id === selected) || safeEvents[safeEvents.length - 1];
   const contractLabel = ev?.contractId || (ev?.sessionId ? "NOT AVAILABLE" : SESSION.contractId);
+
+  if (!ev) {
+    return (
+      <>
+        <PageHead title="Authorization Decisions" desc="Every request an agent makes is evaluated against its declared authority before any tool runs." />
+        <Panel title="DECISION LOG">
+          <Note kind="info">NO LIVE EVENT RECORDED</Note>
+        </Panel>
+      </>
+    );
+  }
 
   return (
     <>
@@ -32,7 +44,7 @@ export default function Decisions({ events, selected, select, go }: any) {
               </tr>
             </thead>
             <tbody>
-              {events.map((e: any) => (
+              {safeEvents.map((e: any) => (
                 <tr
                   key={e.id}
                   className={"clickable" + (e.id === ev.id ? " sel" : "")}

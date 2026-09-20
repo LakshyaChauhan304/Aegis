@@ -12,10 +12,22 @@ import { short, SESSION } from "../../data/fixtures.js";
 import { eventTraceId } from "../../data/controlPlane.ts";
 
 export default function Evidence({ events, selected, select, go, source, chain }: any) {
-  const ev = events.find((e: any) => e.id === selected) || events[events.length - 1];
+  const safeEvents = Array.isArray(events) ? events : [];
+  const ev = safeEvents.find((e: any) => e.id === selected) || safeEvents[safeEvents.length - 1];
   const verified = chain && chain.verified !== false;
-  const okCount = chain && chain.ok != null ? chain.ok : events.length;
-  const total = chain && chain.total != null ? chain.total : events.length;
+  const okCount = chain && chain.ok != null ? chain.ok : safeEvents.length;
+  const total = chain && chain.total != null ? chain.total : safeEvents.length;
+
+  if (!ev) {
+    return (
+      <>
+        <PageHead title="Evidence Ledger" desc="Security-relevant events recorded around every agent action, linked with a SHA-256 evidence hash chain." actions={<SourceFlag source={source} />} />
+        <Panel title="LEDGER">
+          <Note kind="info">NO LIVE EVENT RECORDED</Note>
+        </Panel>
+      </>
+    );
+  }
 
   return (
     <>
@@ -72,7 +84,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
               </tr>
             </thead>
             <tbody>
-              {events.map((e: any) => (
+              {safeEvents.map((e: any) => (
                 <tr
                   key={e.id}
                   className={"clickable" + (e.id === ev.id ? " sel" : "")}
@@ -138,7 +150,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
         </Panel>
 
         <div>
-          <ChainLink ev={ev} events={events} />
+          <ChainLink ev={ev} events={safeEvents} />
         </div>
       </div>
     </>
