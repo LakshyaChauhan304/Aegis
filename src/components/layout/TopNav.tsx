@@ -1,10 +1,8 @@
 import React from "react";
-import { SESSION, CONTRACT } from "../../data/fixtures.js";
-
 export default function TopNav({ activeRun }: any) {
-  const sessionId = activeRun?.sessionId || SESSION.id;
-  const agentName = activeRun?.agentId || SESSION.agentName;
-  const contractId = activeRun?.contractId || CONTRACT.id;
+  const sessionId = activeRun?.sessionId || "NO ACTIVE LIVE SESSION";
+  const agentName = activeRun?.agentId || "NOT AVAILABLE";
+  const contractId = activeRun?.contractId || "NOT AVAILABLE";
   return (
     <div className="authbar">
       <div className="authcell">

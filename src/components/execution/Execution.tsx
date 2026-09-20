@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import aegisApi from "../../data/aegisApi.ts";
-import { fmtT, SESSION } from "../../data/fixtures.js";
+import { fmtT } from "../../data/fixtures.js";
 import BoundaryVisual from "../viz/BoundaryVisual.tsx";
 import DecisionChip from "../shared/DecisionChip.tsx";
 import TrustChip from "../shared/TrustChip.tsx";
@@ -27,7 +27,7 @@ function InfoStrip({ items }: { items: Array<[string, React.ReactNode, string?]>
   );
 }
 
-export default function Execution({ events, idx, go, select, refresh, activeRun, onDevFixRun }: any) {
+export default function Execution({ events, idx, go, select, refresh, activeRun, onDevFixRun, onScenarioRun }: any) {
   const safeEvents = Array.isArray(events) ? events : [];
   const visible = safeEvents.slice(0, idx + 1);
   const current = safeEvents[idx] || safeEvents[safeEvents.length - 1];
@@ -65,8 +65,8 @@ export default function Execution({ events, idx, go, select, refresh, activeRun,
     {
       n: "02",
       title: "TASK CONTRACT",
-      value: current?.contractId || activeRun?.contractId || SESSION.contractId || "NOT AVAILABLE",
-      chip: <StateChip s={activeRun ? "LIVE" : SESSION.signature || "FIXTURE"} />,
+      value: current?.contractId || activeRun?.contractId || "NOT AVAILABLE",
+      chip: <StateChip s={activeRun ? "LIVE" : "UNAVAILABLE"} />,
       desc: "Declared authority bounds the request.",
     },
     {
@@ -107,6 +107,22 @@ export default function Execution({ events, idx, go, select, refresh, activeRun,
           <button className="btn primary" onClick={runLiveHeroFlow} disabled={runningHero}>
             {runningHero ? (heroStatus || "Executing PEP...") : "Run Live Hero Flow"}
           </button>
+          <button className="btn" onClick={async () => {
+            if (!onScenarioRun || runningHero) return;
+            setRunningHero(true);
+            setHeroStatus("Running seven real scenarios through Aegis...");
+            try {
+              const result = await onScenarioRun();
+              setHeroResults(result.steps || []);
+              setHeroStatus("Scenario suite complete. Persistent evidence is available across the control plane.");
+            } catch (error: any) {
+              setHeroStatus(`Scenario error: ${error.message}`);
+            } finally {
+              setRunningHero(false);
+            }
+          }} disabled={!onScenarioRun || runningHero}>
+            Run Scenario Suite
+          </button>
           <button className="btn" onClick={() => go("contracts")}>Task contract</button>
           <button className="btn" onClick={() => go("recorder")}>Flight recorder</button>
         </div>
@@ -127,9 +143,9 @@ export default function Execution({ events, idx, go, select, refresh, activeRun,
 
       <InfoStrip
         items={[
-          ["AGENT", activeRun?.agentId || SESSION.agentName],
-          ["SESSION", activeRun?.sessionId || SESSION.id],
-          ["TASK CONTRACT", activeRun?.contractId || SESSION.contractId],
+          ["AGENT", activeRun?.agentId || "NOT AVAILABLE"],
+          ["SESSION", activeRun?.sessionId || "NO ACTIVE LIVE SESSION"],
+          ["TASK CONTRACT", activeRun?.contractId || "NOT AVAILABLE"],
           ["AUTHORITY", "Declared Scope"],
           ["STATE", activeRun?.status || (denied ? "HALTED AT DENY" : "RUNNING"), denied ? "deny" : "allow"],
         ]}

@@ -5,7 +5,6 @@ import Chip from "../shared/Chip.tsx";
 import KV from "../shared/KV.tsx";
 import Note from "../shared/Note.tsx";
 import SourceFlag from "../shared/SourceFlag.tsx";
-import { CONTRACT } from "../../data/fixtures.js";
 
 function ScopeList({ items, kind }: any) {
   const glyph = kind === "deny" ? "\u2715" : kind === "allow" ? "\u2713" : "\u00b7";
@@ -25,17 +24,30 @@ function ScopeList({ items, kind }: any) {
   );
 }
 
-export default function Contracts({ go }: any) {
-  const c = CONTRACT;
+export default function Contracts({ go, contract }: any) {
+  const live = !!contract;
+  const c = live ? {
+    id: contract.contractId, purpose: contract.purpose, agent: contract.agentId, agentId: contract.agentId,
+    session: contract.session?.allowedPrefixes?.join(", ") || "PREFIX-BOUND", issuedAt: "NOT AVAILABLE",
+    expiresAt: "NOT AVAILABLE", ttl: "NOT AVAILABLE", deployment: "LIVE BACKEND REGISTRY",
+    tools: contract.scope?.allowed?.map((entry: any) => `${entry.tool} ${entry.action}`) || [],
+    network: [], networkDeny: [], fsAllow: contract.scope?.allowed?.map((entry: any) => entry.resource) || [],
+    fsDeny: contract.scope?.deniedResources || [], signatureAlg: "NOT IMPLEMENTED", signatureKid: "NOT IMPLEMENTED",
+  } : {
+    id: "NOT AVAILABLE", purpose: "Task contract unavailable", agent: "NOT AVAILABLE", agentId: "NOT AVAILABLE",
+    session: "NOT AVAILABLE", issuedAt: "NOT AVAILABLE", expiresAt: "NOT AVAILABLE", ttl: "NOT AVAILABLE",
+    deployment: "NOT VERIFIED", tools: [], network: [], networkDeny: [], fsAllow: [], fsDeny: [],
+    signatureAlg: "NOT IMPLEMENTED", signatureKid: "NOT IMPLEMENTED",
+  };
 
   return (
     <>
       <PageHead
         title="Task Contracts"
-        desc="This surface shows declared session scope from demo/fallback data. Signed contract enforcement is not implemented in the current backend."
+        desc="This surface shows the task contract loaded from the Aegis backend. Signed contract enforcement remains explicitly unverified."
         actions={
           <>
-            <SourceFlag source="FIXTURE" />
+            <SourceFlag source={live ? "LIVE" : "UNAVAILABLE"} />
             <button className="btn" onClick={() => go("execution")}>Agent execution</button>
             <button className="btn" onClick={() => go("policies")}>Policy</button>
           </>
@@ -49,7 +61,7 @@ export default function Contracts({ go }: any) {
             <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{c.purpose}</div>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Chip kind="ghost">FIXTURE SCOPE</Chip>
+            <Chip kind="ghost">{live ? "LIVE SCOPE" : "NOT AVAILABLE"}</Chip>
             <Chip kind="warn">SIGNATURE NOT VERIFIED</Chip>
             <Chip kind="ghost">TTL {c.ttl}</Chip>
             <Chip kind="info">SESSION {c.session}</Chip>
@@ -106,7 +118,7 @@ export default function Contracts({ go }: any) {
           <div style={{ flex: "1 1 300px" }}>
             <Note>
               KMS-backed signed Task Contract verification is not implemented in this phase.
-              The values on this page are retained as explicitly labeled demo/fallback scope data.
+              Contract scope above is read from the backend registry.
             </Note>
           </div>
         </div>

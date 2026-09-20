@@ -7,7 +7,9 @@ import { analyzeEvidence } from "./bedrock-investigator.js";
 import { getAegisStatus, getCapabilities, getPolicyInfo } from "./status.js";
 import { executeAgentTool } from "./agent-invoke.js";
 import { runDevFix } from "./devfix-runner.js";
-import { ToolRequest, DEVFIX_CONTRACT_ID } from "./task-contracts.js";
+import { DEVFIX_CONTRACT_ID, getTaskContract, ToolRequest } from "./task-contracts.js";
+import { runScenarioSuite } from "./scenario-runner.js";
+import { getPersistedHistory } from "./history.js";
 
 function tokenMatches(expected: string, supplied: string) {
   const expectedBytes = Buffer.from(expected);
@@ -42,8 +44,8 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  app.get("/api/aegis/status", (req, res) => {
-    res.json(getAegisStatus(globalLedger.getEvents()));
+  app.get("/api/aegis/status", async (req, res) => {
+    res.json(await getAegisStatus(globalLedger.getEvents()));
   });
 
   app.get("/api/aegis/policy", requireAegisApiAccess, (req, res) => {
@@ -52,6 +54,23 @@ async function startServer() {
 
   app.get("/api/aegis/capabilities", (req, res) => {
     res.json(getCapabilities());
+  });
+
+  app.get("/api/aegis/contract", requireAegisApiAccess, (req, res) => {
+    const contract = getTaskContract(DEVFIX_CONTRACT_ID);
+    return contract ? res.json({ source: "LIVE", contract, signature: "NOT_VERIFIED" }) : res.status(404).json({ error: "Contract not found" });
+  });
+
+  app.get("/api/history", requireAegisApiAccess, async (req, res) => {
+    res.json(await getPersistedHistory());
+  });
+
+  app.post("/api/scenarios/run", requireAegisApiAccess, async (req, res) => {
+    try {
+      res.status(200).json(await runScenarioSuite());
+    } catch (error: any) {
+      res.status(500).json({ error: "Scenario suite failed", reason: error?.message || "SCENARIO_RUN_FAILED" });
+    }
   });
 
   // Expose Ledger APIs

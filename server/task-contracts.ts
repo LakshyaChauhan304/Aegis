@@ -118,6 +118,7 @@ const devfixContractDefinition: ContractDefinition = {
       "sess_contract_",
       "sess_phase3_",
       "sess_phase4_",
+      "sess_scenario_",
     ],
   },
   purpose: "dependency remediation",

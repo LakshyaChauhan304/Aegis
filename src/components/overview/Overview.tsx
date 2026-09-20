@@ -1,6 +1,5 @@
 import React from "react";
 import AegisRuntimeArchitecture from "../viz/AegisRuntimeArchitecture.tsx";
-import { SESSION } from "../../data/fixtures.js";
 
 export default function Overview({ events, idx, go, chain, analysis, activeRun }: any) {
   const allow = events.filter((e: any) => e.decision === "ALLOW").length;
@@ -10,9 +9,9 @@ export default function Overview({ events, idx, go, chain, analysis, activeRun }
   const currentEvent = events[idx] || events[events.length - 1] || null;
   const chainVerified = chain?.verified !== false;
   const chainText = chain?.ok != null && chain?.total != null ? `${chain.ok}/${chain.total}` : `${events.length}/${events.length}`;
-  const sessionId = activeRun?.sessionId || SESSION.id;
-  const agentName = activeRun?.agentId || SESSION.agentName;
-  const contractId = activeRun?.contractId || SESSION.contractId;
+  const sessionId = activeRun?.sessionId || "NO ACTIVE LIVE SESSION";
+  const agentName = activeRun?.agentId || "NOT AVAILABLE";
+  const contractId = activeRun?.contractId || "NOT AVAILABLE";
 
   return (
     <div className="overview-page">

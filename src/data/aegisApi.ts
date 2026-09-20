@@ -13,6 +13,9 @@ export const ENDPOINTS = {
   status: () => `${API_BASE}/api/aegis/status`,
   policy: () => `${API_BASE}/api/aegis/policy`,
   capabilities: () => `${API_BASE}/api/aegis/capabilities`,
+  contract: () => `${API_BASE}/api/aegis/contract`,
+  history: () => `${API_BASE}/api/history`,
+  scenariosRun: () => `${API_BASE}/api/scenarios/run`,
   reconstruct: (sessionId: string) => `${API_BASE}/api/agent/sessions/${encodeURIComponent(sessionId)}/reconstruct`,
 };
 
@@ -114,6 +117,31 @@ function extractEvents(data: any) {
 }
 
 export const aegisApi = {
+  async getHistory() {
+    const r = await request(ENDPOINTS.history());
+    if (r.ok && r.data) {
+      const events = extractEvents(r.data) || [];
+      return { ...r.data, source: r.data.source || "LIVE", events };
+    }
+    return unavailable(r, { events: [], sessions: [], agents: [], decisions: [], recentActivity: [], totalEvents: 0 });
+  },
+
+  async runScenarios() {
+    const r = await request(ENDPOINTS.scenariosRun(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (r.ok && r.data) return { source: "LIVE", ...r.data };
+    return unavailable(r, { status: "UNAVAILABLE", steps: [], scenarioCount: 0 });
+  },
+
+  async getContract() {
+    const r = await request(ENDPOINTS.contract());
+    if (r.ok && r.data) return { source: "LIVE", ...r.data };
+    return unavailable(r, { contract: null, signature: "NOT_VERIFIED" });
+  },
+
   async getLedger() {
     const r = await request(ENDPOINTS.ledger());
     if (r.ok) {
