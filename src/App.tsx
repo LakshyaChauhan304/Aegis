@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AppShell from "./components/layout/AppShell.tsx";
 import Overview from "./components/overview/Overview.tsx";
 import Agents from "./components/agents/Agents.tsx";
@@ -15,13 +15,12 @@ import SecurityTests from "./components/tests/SecurityTests.tsx";
 import AwsControlPlane from "./components/aws/AwsControlPlane.tsx";
 import Onboarding from "./components/onboarding/Onboarding.tsx";
 import aegisApi from "./data/aegisApi.ts";
-import { EVENTS } from "./data/fixtures.js";
 import { parseHash, ROUTE_IDS, ROUTE_LABELS } from "./components/layout/routes.ts";
 
 export default function App() {
   const [route, setRouteState] = useState(parseHash(window.location.hash));
-  const [data, setData] = useState<any>({ source: "FIXTURE", events: EVENTS });
-  const [chain, setChain] = useState<any>({ source: "FIXTURE", verified: true, ok: EVENTS.length, total: EVENTS.length });
+  const [data, setData] = useState<any>({ source: "UNAVAILABLE", events: [] });
+  const [chain, setChain] = useState<any>({ source: "UNAVAILABLE", verified: false, ok: 0, total: 0 });
   const [analysis, setAnalysis] = useState<any>({
     source: "UNAVAILABLE",
     analysis: {
@@ -32,8 +31,12 @@ export default function App() {
       notAsserted: ["No Bedrock analysis has been run for this view."],
     }
   });
-  const [playIdx, setPlayIdx] = useState(EVENTS.length - 1);
-  const [selectedEvent, selectEvent] = useState<any>(EVENTS[EVENTS.length - 1]?.id || null);
+  const [playIdx, setPlayIdx] = useState(0);
+  const [selectedEvent, selectEvent] = useState<any>(null);
+  const [activeRun, setActiveRun] = useState<any>(null);
+  const [history, setHistory] = useState<any>(null);
+  const [contract, setContract] = useState<any>(null);
+  const liveRunGeneration = useRef(0);
 
   const setRoute = (r: string) => {
     window.location.hash = r;
@@ -51,35 +54,142 @@ export default function App() {
   }, [route]);
 
   const refreshLedger = async () => {
+    const persisted = await aegisApi.getHistory();
+    if (persisted.source === "LIVE") {
+      const events = persisted.events || [];
+      setHistory(persisted);
+      setData({ source: "LIVE", events });
+      setChain({ source: "LIVE", verified: false, ok: null, total: events.length });
+      setPlayIdx(Math.max(0, events.length - 1));
+      if (events.length) selectEvent(events[events.length - 1].id);
+      return;
+    }
     const [ledgerRes, chainRes] = await Promise.all([
       aegisApi.getLedger(),
       aegisApi.verifyChain()
     ]);
-    setData(ledgerRes);
+    const liveEvents = (ledgerRes.events || []).filter((event: any) => event.eventType === "AUTHORIZATION_EXECUTION");
+    setData({ ...ledgerRes, events: liveEvents });
     setChain(chainRes);
-    const evs = ledgerRes.events || [];
+    const evs = liveEvents;
     setPlayIdx(Math.max(0, evs.length - 1));
     if (evs.length) {
       selectEvent(evs[evs.length - 1].id);
     }
   };
 
+  const runDevFix = async () => {
+    liveRunGeneration.current += 1;
+    const run = await aegisApi.runDevFix();
+    if (run.source === "UNAVAILABLE" || !run.sessionId || !Array.isArray(run.steps)) {
+      throw new Error(run.reason || "DevFix backend is unavailable");
+    }
+
+    const [historyRes, ledgerRes, chainRes] = await Promise.all([
+      aegisApi.getHistory(),
+      aegisApi.getLedger(),
+      aegisApi.verifyChain(),
+    ]);
+    if (historyRes.source === "LIVE" && historyRes.events?.length) setHistory(historyRes);
+    const ledgerEvents = ((historyRes.source === "LIVE" ? historyRes.events : ledgerRes.events) || []).filter((event: any) =>
+      event.eventType === "AUTHORIZATION_EXECUTION" && event.sessionId === run.sessionId
+    );
+    const hasLedgerEvidence = ledgerEvents.length === run.steps.length;
+    const evidenceSource = hasLedgerEvidence ? "LIVE" : "DERIVED";
+    const events = hasLedgerEvidence
+      ? ledgerEvents
+      : run.steps.map((step: any, index: number) => ({
+        seq: index + 1,
+        id: step.eventId,
+        eventId: step.eventId,
+        t: index,
+        tool: step.tool,
+        action: step.action,
+        resource: step.resource,
+        trust: step.trust,
+        decision: step.decision,
+        reason: step.reason || "NOT AVAILABLE",
+        execution: step.executionState,
+        bytes: step.bytes,
+        sessionId: run.sessionId,
+        agentId: run.agentId,
+        contractId: run.contractId,
+      }));
+
+    setActiveRun({ ...run, events, evidenceSource });
+    setData({ source: evidenceSource, events });
+    setChain(hasLedgerEvidence ? chainRes : { source: "UNAVAILABLE", verified: false, ok: null, total: null });
+    setPlayIdx(Math.max(0, events.length - 1));
+    const finalEvent = events[events.length - 1];
+    selectEvent(finalEvent?.id || null);
+    setAnalysis({
+      source: "UNAVAILABLE",
+      analysis: {
+        generatedBy: "Not run",
+        whatHappened: ["Select the recorded event and run a post-hoc investigation to invoke Bedrock."],
+        basis: [],
+        refs: [],
+        notAsserted: ["No Bedrock analysis has been run for this live run."],
+      },
+    });
+    return { ...run, events };
+  };
+
+  const runScenarioSuite = async () => {
+    const result = await aegisApi.runScenarios();
+    if (result.source === "UNAVAILABLE") throw new Error(result.reason || "Scenario suite unavailable");
+    const events = (result.steps || []).map((step: any, index: number) => ({
+      seq: index + 1,
+      id: step.eventId,
+      eventId: step.eventId,
+      timestamp: null,
+      t: index,
+      tool: step.tool,
+      action: step.action,
+      resource: step.resource,
+      trust: step.trust,
+      decision: step.decision,
+      reason: step.reason,
+      execution: step.executionState,
+      bytes: step.bytes,
+      sessionId: step.sessionId,
+      agentId: step.agentId,
+      contractId: step.contractId,
+      authProvider: step.authorizationProvider,
+      archivalStatus: step.archivalStatus,
+    }));
+    setActiveRun({ ...result, events, evidenceSource: "DERIVED" });
+    setData({ source: "DERIVED", events });
+    setChain({ source: "UNAVAILABLE", verified: false, ok: null, total: null });
+    setPlayIdx(Math.max(0, events.length - 1));
+    selectEvent(events[events.length - 1]?.id || null);
+    await refreshLedger();
+    return { ...result, events };
+  };
+
   useEffect(() => {
     let active = true;
-    Promise.all([
-      aegisApi.getLedger(),
-      aegisApi.verifyChain()
-    ]).then(([ledgerRes, chainRes]) => {
-      if (!active) return;
-      setData(ledgerRes);
-      setChain(chainRes);
-      const evs = ledgerRes.events || [];
+    const requestGeneration = liveRunGeneration.current;
+    aegisApi.getHistory().then((historyRes) => {
+      if (!active || requestGeneration !== liveRunGeneration.current) return;
+      if (historyRes.source === "LIVE") {
+        setHistory(historyRes);
+        setData({ source: "LIVE", events: historyRes.events || [] });
+        setChain({ source: "LIVE", verified: false, ok: null, total: (historyRes.events || []).length });
+      } else return;
+      const evs = historyRes.events || [];
       setPlayIdx(Math.max(0, evs.length - 1));
       if (evs.length) {
         selectEvent(evs[evs.length - 1].id);
       }
     });
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    aegisApi.getContract().then((result) => {
+      if (result.source === "LIVE" && result.contract) setContract(result.contract);
+    });
   }, []);
 
   const Component = {
@@ -103,6 +213,13 @@ export default function App() {
     return <Onboarding go={setRoute} />;
   }
 
+  const currentRun = activeRun || (history?.events?.length ? {
+    sessionId: history.events[history.events.length - 1]?.sessionId,
+    agentId: history.events[history.events.length - 1]?.agentId,
+    contractId: history.events[history.events.length - 1]?.contractId,
+    status: "HISTORY",
+  } : null);
+
   return (
     <AppShell
       route={route}
@@ -111,7 +228,8 @@ export default function App() {
       playIdx={playIdx}
       setPlayIdx={setPlayIdx}
       selectedEvent={selectedEvent}
-      selectEvent={selectEvent}>
+      selectEvent={selectEvent}
+      activeRun={currentRun}>
       <Component
         events={data.events}
         idx={playIdx}
@@ -122,6 +240,10 @@ export default function App() {
         source={data.source}
         chain={chain}
         refresh={refreshLedger}
+        activeRun={currentRun}
+        onDevFixRun={runDevFix}
+        onScenarioRun={runScenarioSuite}
+        contract={contract}
         analysis={analysis.analysis}
         analysisSource={analysis.source}
         setAnalysis={setAnalysis}

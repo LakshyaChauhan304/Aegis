@@ -1,13 +1,16 @@
+import { authHeaders } from "./test-auth.ts";
+
 async function testPhase6Hardening() {
   console.log("=== PHASE 6: INTEGRATION HARDENING TEST ===\n");
   const runSessionId = "sess_hardening_" + Date.now();
   async function invoke(tool: string, action: string, resource: string, trust: string) {
     const res = await fetch("http://localhost:3000/api/agent/invoke", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         sessionId: runSessionId,
-        agentId: "DevFix_Test",
+        agentId: "DevFix",
+        contractId: "tc_devfix_dependency_remediation_v1",
         tool,
         resource,
         action,
@@ -42,7 +45,7 @@ async function testPhase6Hardening() {
   console.log("✅ Tool execution blocked on DENY, 403 returned");
 
   // Fetch Ledger to verify 1 event per request and hash chain validity
-  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger");
+  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger", { headers: authHeaders() });
   const ledger = await ledgerRes.json();
   
   const allowEvent = ledger.find((e: any) => e.eventId === allowRes.data.decision.eventId);
@@ -52,15 +55,16 @@ async function testPhase6Hardening() {
     throw new Error("Events not recorded in the ledger!");
   }
   
-  console.log("\nTEST: One request creates one evidence event");
+  console.log("\nTEST: One request creates one primary evidence event");
   const recentEvents = ledger.filter((e: any) => e.sessionId === runSessionId);
-  if (recentEvents.length !== 2) {
-    throw new Error(`Expected exactly 2 events created in this test, got ${recentEvents.length}`);
+  const primaryEvents = recentEvents.filter((e: any) => e.eventType === "AUTHORIZATION_EXECUTION");
+  if (primaryEvents.length !== 2) {
+    throw new Error(`Expected exactly 2 primary events created in this test, got ${primaryEvents.length}`);
   }
-  console.log("✅ Exactly 1 evidence event created per request");
+  console.log("✅ Exactly 1 primary evidence event created per request");
 
   console.log("\nTEST: Hash chain remains valid across multiple requests");
-  const verifyRes = await fetch("http://localhost:3000/api/agent/ledger/verify");
+  const verifyRes = await fetch("http://localhost:3000/api/agent/ledger/verify", { headers: authHeaders() });
   const verifyData = await verifyRes.json();
   if (!verifyData.valid) {
     throw new Error("Hash chain verification failed!");
@@ -74,7 +78,7 @@ async function testPhase6Hardening() {
   console.log("✅ Secret/Content exclusion boundary verified");
 
   console.log("\nTEST: Test post-hoc Bedrock execution independently");
-  const bedrockRes = await fetch(`http://localhost:3000/api/agent/investigate/${denyRes.data.decision.eventId}`);
+  const bedrockRes = await fetch(`http://localhost:3000/api/agent/investigate/${denyRes.data.decision.eventId}`, { headers: authHeaders() });
   const bedrockData = await bedrockRes.json();
   if (bedrockRes.status === 200 && bedrockData.investigationStatus.status === "failed") {
     console.log("✅ Bedrock failed gracefully on post-hoc DENY investigation");

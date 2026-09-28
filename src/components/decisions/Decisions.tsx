@@ -10,9 +10,21 @@ import EvaluationChain from "./EvaluationChain.tsx";
 import { SESSION } from "../../data/fixtures.js";
 import { eventTraceId } from "../../data/controlPlane.ts";
 
-export default function Decisions({ events, selected, select, go }: any) {
-  const ev = events.find((e: any) => e.id === selected) || events[events.length - 1];
-  const contractLabel = ev.sessionId ? "NOT AVAILABLE" : SESSION.contractId;
+export default function Decisions({ events, selected, select, go, source }: any) {
+  const safeEvents = Array.isArray(events) ? events : [];
+  const ev = safeEvents.find((e: any) => e.id === selected) || safeEvents[safeEvents.length - 1];
+  const contractLabel = ev?.contractId || (ev?.sessionId ? "NOT AVAILABLE" : SESSION.contractId);
+
+  if (!ev) {
+    return (
+      <>
+        <PageHead title="Authorization Decisions" desc="Every request an agent makes is evaluated against its declared authority before any tool runs." />
+        <Panel title="DECISION LOG">
+          <Note kind="info">NO LIVE EVENT RECORDED</Note>
+        </Panel>
+      </>
+    );
+  }
 
   return (
     <>
@@ -32,13 +44,13 @@ export default function Decisions({ events, selected, select, go }: any) {
               </tr>
             </thead>
             <tbody>
-              {events.map((e: any) => (
+              {safeEvents.map((e: any) => (
                 <tr
                   key={e.id}
                   className={"clickable" + (e.id === ev.id ? " sel" : "")}
                   onClick={() => select(e.id)}>
                   <td className="m dim">{e.t.toFixed(3)}</td>
-                  <td className="m">{e.agentId || SESSION.agentId}</td>
+                  <td className="m">{e.agentId || (source === "FIXTURE" ? SESSION.agentId : "NOT AVAILABLE")}</td>
                   <td className="m">{e.action}</td>
                   <td className="m">{e.resource}</td>
                   <td className="m">
@@ -74,8 +86,8 @@ export default function Decisions({ events, selected, select, go }: any) {
           <KV
             rows={[
               ["TRACE ID", eventTraceId(ev)],
-              ["WHO", `${SESSION.agentName} (Agent::"${ev.agentId || SESSION.agentId}")`],
-              ["SESSION", ev.sessionId || SESSION.id],
+              ["WHO", `${ev.agentId || (source === "FIXTURE" ? SESSION.agentName : "NOT AVAILABLE")} (Agent::"${ev.agentId || (source === "FIXTURE" ? SESSION.agentId : "NOT AVAILABLE")}")`],
+              ["SESSION", ev.sessionId || (source === "FIXTURE" ? SESSION.id : "NOT AVAILABLE")],
               ["WHAT", ev.action],
               ["RESOURCE", ev.resource],
               ["TASK CONTRACT", contractLabel],

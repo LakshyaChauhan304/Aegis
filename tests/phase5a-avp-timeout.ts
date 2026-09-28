@@ -32,6 +32,7 @@ async function main() {
     const decision = await authorize({
       sessionId: "timeout-test",
       agentId: "DevFix",
+      contractId: "tc_devfix_dependency_remediation_v1",
       tool: "fs",
       resource: "package.json",
       action: "fs:read",

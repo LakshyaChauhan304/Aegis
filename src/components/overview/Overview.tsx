@@ -1,8 +1,7 @@
 import React from "react";
 import AegisRuntimeArchitecture from "../viz/AegisRuntimeArchitecture.tsx";
-import { SESSION } from "../../data/fixtures.js";
 
-export default function Overview({ events, idx, go, chain, analysis }: any) {
+export default function Overview({ events, idx, go, chain, analysis, activeRun }: any) {
   const allow = events.filter((e: any) => e.decision === "ALLOW").length;
   const deny = events.filter((e: any) => e.decision === "DENY").length;
   const untrusted = events.filter((e: any) => e.trust === "UNTRUSTED_EXTERNAL").length;
@@ -10,6 +9,9 @@ export default function Overview({ events, idx, go, chain, analysis }: any) {
   const currentEvent = events[idx] || events[events.length - 1] || null;
   const chainVerified = chain?.verified !== false;
   const chainText = chain?.ok != null && chain?.total != null ? `${chain.ok}/${chain.total}` : `${events.length}/${events.length}`;
+  const sessionId = activeRun?.sessionId || "NO ACTIVE LIVE SESSION";
+  const agentName = activeRun?.agentId || "NOT AVAILABLE";
+  const contractId = activeRun?.contractId || "NOT AVAILABLE";
 
   return (
     <div className="overview-page">
@@ -40,13 +42,13 @@ export default function Overview({ events, idx, go, chain, analysis }: any) {
             </div>
             <div className="session-body">
               <div className="session-primary">
-                <div className="session-id">{SESSION.id}</div>
-                <div className="session-status">ACTIVE</div>
+                <div className="session-id">{sessionId}</div>
+                <div className="session-status">{activeRun?.status || "ACTIVE"}</div>
               </div>
               <div className="session-grid">
                 {[
-                  ["Agent", SESSION.agentName],
-                  ["Contract", SESSION.contractId],
+                  ["Agent", agentName],
+                  ["Contract", contractId],
                   ["Events", events.length],
                   ["Allowed", allow],
                   ["Denied", deny],
@@ -98,8 +100,8 @@ export default function Overview({ events, idx, go, chain, analysis }: any) {
           <span className="icon">A</span>
           <span>
             <span className="label">Active Agent</span>
-            <span className="value">{SESSION.agentName}</span>
-            <span className="meta">Session {SESSION.id} / fixture-backed</span>
+            <span className="value">{agentName}</span>
+            <span className="meta">Session {sessionId} / {activeRun ? "live backend run" : "fixture-backed"}</span>
           </span>
         </button>
       </section>

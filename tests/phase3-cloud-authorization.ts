@@ -1,13 +1,16 @@
+import { authHeaders } from "./test-auth.ts";
+
 async function testPhase3() {
   console.log("=== PHASE 3: AMAZON VERIFIED PERMISSIONS AUTHORIZATION TEST ===");
 
   async function invoke(tool: string, action: string, resource: string, trust: string) {
     const res = await fetch("http://localhost:3000/api/agent/invoke", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         sessionId: "sess_test_" + Date.now(),
-        agentId: "DevFix_Test",
+        agentId: "DevFix",
+        contractId: "tc_devfix_dependency_remediation_v1",
         tool,
         resource,
         action,
@@ -28,7 +31,7 @@ async function testPhase3() {
   console.log(`- EventId: ${resB.decision?.eventId || resB.eventId}`);
 
   console.log("\n3. Inspecting the Evidence Ledger to verify Authorization Provider ...");
-  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger");
+  const ledgerRes = await fetch("http://localhost:3000/api/agent/ledger", { headers: authHeaders() });
   const ledger = await ledgerRes.json();
   
   const lastTwo = ledger.slice(-2);

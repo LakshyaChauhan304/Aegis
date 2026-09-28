@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import PageHead from "../shared/PageHead.tsx";
 import Panel from "../shared/Panel.tsx";
 import StateChip from "../shared/StateChip.tsx";
@@ -77,10 +77,29 @@ const INITIAL_INVARIANTS: TestResult[] = [
   },
 ];
 
-export default function SecurityTests() {
+export default function SecurityTests({ activeRun }: any) {
   const [invariants, setInvariants] = useState<TestResult[]>(INITIAL_INVARIANTS);
   const [isRunning, setIsRunning] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
+
+  useEffect(() => {
+    const events = activeRun?.events;
+    if (!Array.isArray(events) || events.length === 0) return;
+    const allow = events.find((event: any) => event.resource === "package.json" && event.decision === "ALLOW");
+    const deny = events.find((event: any) => event.resource === ".env" && event.decision === "DENY");
+    const updated = [...INITIAL_INVARIANTS];
+    if (allow) {
+      updated[0] = { ...updated[0], status: "PASSED", details: "Live DevFix evidence shows package.json was allowed and executed.", evidence: `${allow.id} · ${allow.execution || "EXECUTED"}` };
+    }
+    if (deny) {
+      updated[1] = { ...updated[1], status: deny.execution === "NOT_EXECUTED" ? "PASSED" : "FAILED", details: "Live DevFix evidence shows .env was denied before execution.", evidence: `${deny.id} · ${deny.execution}` };
+      updated[2] = deny.http === 403
+        ? { ...updated[2], status: "PASSED", details: "Live API response returned HTTP 403 for the denied request.", evidence: `${deny.id} · HTTP 403` }
+        : { ...updated[2], status: "PENDING", details: "NOT VERIFIED / NOT RUN: the DevFix run records DENY but does not expose a separate HTTP 403 response.", evidence: "NOT VERIFIED" };
+      updated[3] = { ...updated[3], status: deny.bytes === 0 ? "PASSED" : "FAILED", details: "Live DevFix evidence records zero protected bytes returned.", evidence: `${deny.id} · ${deny.bytes} bytes`, bytesExposed: deny.bytes };
+    }
+    setInvariants(updated);
+  }, [activeRun]);
 
   const runLiveSuite = async () => {
     setIsRunning(true);
@@ -155,14 +174,13 @@ export default function SecurityTests() {
         log("✗ Secret exclusion failed: Found secret material in event stream.");
       }
 
-      // Test 7: Graceful Degradation
+      // Test 7: Graceful Degradation requires an isolated credential-free runtime.
       log("[TEST 5/5] Checking AWS fallback behavior in local sandbox...");
-      updated[6].status = "PASSED";
-      updated[6].details = "Local Cedar policy engine and in-memory ledger active. AWS telemetry degraded gracefully.";
-      updated[6].evidence = "Local runtime checked";
-      log("✓ Graceful degradation verified: Local Cedar operational without cloud keys.");
+      updated[6].details = "NOT VERIFIED / NOT RUN: this browser suite does not create a credential-free isolated runtime.";
+      updated[6].evidence = "NOT VERIFIED";
+      log("… Graceful degradation not verified in this environment.");
 
-      log("[COMPLETE] All 7 core security invariants verified.");
+      log("[COMPLETE] Available live security checks finished; environment-dependent checks remain unverified.");
     } catch (err: any) {
       log(`[ERROR] Test suite error: ${err.message}`);
     } finally {

@@ -1,0 +1,281 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Minimal single-task ECS/Fargate deployment for the current Aegis Express backend
+  behind an Application Load Balancer. Phase 8 keeps desired count at 1 because the
+  evidence ledger is process-local and reconstruction does not read from DynamoDB/S3.
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: aegis
+  ContainerImage:
+    Type: String
+    Description: ECR image URI for the Aegis container.
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PublicSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  AegisApiTokenSecretArn:
+    Type: String
+    Description: Secrets Manager secret ARN containing the AEGIS_API_TOKEN value.
+  AwsRegion:
+    Type: String
+    Default: ap-southeast-2
+  AvpPolicyStoreId:
+    Type: String
+    Default: UNCONFIGURED_STORE_ID
+  EventBusName:
+    Type: String
+    Default: default
+  EventBusArn:
+    Type: String
+    Description: ARN of the EventBridge bus used by PutEvents.
+  DynamoDbTableName:
+    Type: String
+    Default: AegisEvidence
+  DynamoDbTableArn:
+    Type: String
+    Description: ARN of the DynamoDB evidence table.
+  EvidenceBucketName:
+    Type: String
+    Description: S3 bucket name for evidence archival.
+  EvidenceBucketArn:
+    Type: String
+    Description: ARN of the S3 bucket for evidence archival.
+  BedrockModelArn:
+    Type: String
+    Default: ""
+    Description: Optional ARN of the configured Bedrock model/inference profile. Leave blank to grant no Bedrock invoke permission.
+  BedrockModelId:
+    Type: String
+    Default: ""
+    Description: Optional Bedrock model or inference profile ID. Leave blank to keep investigation degraded.
+  ContainerCpu:
+    Type: Number
+    Default: 512
+  ContainerMemory:
+    Type: Number
+    Default: 1024
+
+Conditions:
+  HasBedrockModelArn: !Not [!Equals [!Ref BedrockModelArn, ""]]
+
+Resources:
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${ServiceName}
+      RetentionInDays: 14
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ServiceName} ALB ingress
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ServiceName} ECS task ingress from ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref AlbSecurityGroup
+      Subnets: !Ref PublicSubnetIds
+      Type: application
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 3000
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckEnabled: true
+      HealthCheckPath: /api/health
+      Matcher:
+        HttpCode: "200"
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${ServiceName}-cluster
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-aegis-api-token-secret
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref AegisApiTokenSecretArn
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: aegis-current-aws-sdk-paths
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: AvpAuthorization
+                Effect: Allow
+                Action:
+                  - verifiedpermissions:IsAuthorized
+                Resource: !Sub arn:${AWS::Partition}:verifiedpermissions:${AwsRegion}:${AWS::AccountId}:policy-store/${AvpPolicyStoreId}
+              - Sid: EvidenceEventBridgePublish
+                Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource: !Ref EventBusArn
+              - Sid: EvidenceDynamoDbPut
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !Ref DynamoDbTableArn
+              - Sid: EvidenceS3ObjectLockPut
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectRetention
+                Resource: !Sub ${EvidenceBucketArn}/evidence/*
+              - !If
+                - HasBedrockModelArn
+                - Sid: BedrockPostHocInvestigation
+                  Effect: Allow
+                  Action:
+                    - bedrock:InvokeModel
+                  Resource: !Ref BedrockModelArn
+                - !Ref AWS::NoValue
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${ServiceName}-task
+      Cpu: !Ref ContainerCpu
+      Memory: !Ref ContainerMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Image: !Ref ContainerImage
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: PORT
+              Value: "3000"
+            - Name: AWS_REGION
+              Value: !Ref AwsRegion
+            - Name: AVP_POLICY_STORE_ID
+              Value: !Ref AvpPolicyStoreId
+            - Name: AEGIS_EVENT_BUS
+              Value: !Ref EventBusName
+            - Name: AEGIS_DYNAMODB_TABLE
+              Value: !Ref DynamoDbTableName
+            - Name: AEGIS_S3_BUCKET
+              Value: !Ref EvidenceBucketName
+            - Name: BEDROCK_MODEL_ID
+              Value: !Ref BedrockModelId
+          Secrets:
+            - Name: AEGIS_API_TOKEN
+              ValueFrom: !Ref AegisApiTokenSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 20
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - Listener
+    Properties:
+      ServiceName: !Sub ${ServiceName}-service
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref TaskSecurityGroup
+          Subnets: !Ref PublicSubnetIds
+      LoadBalancers:
+        - ContainerName: !Ref ServiceName
+          ContainerPort: 3000
+          TargetGroupArn: !Ref TargetGroup
+
+Outputs:
+  LoadBalancerDnsName:
+    Description: Public ALB DNS name for the Phase 8 proof endpoint.
+    Value: !GetAtt LoadBalancer.DNSName
+  HealthUrl:
+    Description: Public health check URL.
+    Value: !Sub http://${LoadBalancer.DNSName}/api/health

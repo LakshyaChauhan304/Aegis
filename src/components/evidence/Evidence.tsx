@@ -12,10 +12,22 @@ import { short, SESSION } from "../../data/fixtures.js";
 import { eventTraceId } from "../../data/controlPlane.ts";
 
 export default function Evidence({ events, selected, select, go, source, chain }: any) {
-  const ev = events.find((e: any) => e.id === selected) || events[events.length - 1];
+  const safeEvents = Array.isArray(events) ? events : [];
+  const ev = safeEvents.find((e: any) => e.id === selected) || safeEvents[safeEvents.length - 1];
   const verified = chain && chain.verified !== false;
-  const okCount = chain && chain.ok != null ? chain.ok : events.length;
-  const total = chain && chain.total != null ? chain.total : events.length;
+  const okCount = chain && chain.ok != null ? chain.ok : safeEvents.length;
+  const total = chain && chain.total != null ? chain.total : safeEvents.length;
+
+  if (!ev) {
+    return (
+      <>
+        <PageHead title="Evidence Ledger" desc="Security-relevant events recorded around every agent action, linked with a SHA-256 evidence hash chain." actions={<SourceFlag source={source} />} />
+        <Panel title="LEDGER">
+          <Note kind="info">NO LIVE EVENT RECORDED</Note>
+        </Panel>
+      </>
+    );
+  }
 
   return (
     <>
@@ -72,7 +84,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
               </tr>
             </thead>
             <tbody>
-              {events.map((e: any) => (
+              {safeEvents.map((e: any) => (
                 <tr
                   key={e.id}
                   className={"clickable" + (e.id === ev.id ? " sel" : "")}
@@ -118,10 +130,10 @@ export default function Evidence({ events, selected, select, go, source, chain }
           <KV
             rows={[
               ["EVENT ID", ev.id],
-              ["TIMESTAMP", ev.timestamp || SESSION.startedAt.slice(0, 11) + "09:14:" + (20 + ev.t).toFixed(3) + "Z"],
+              ["TIMESTAMP", ev.timestamp || (source === "FIXTURE" ? SESSION.startedAt.slice(0, 11) + "09:14:" + (20 + ev.t).toFixed(3) + "Z" : "NOT AVAILABLE")],
               ["SESSION", ev.sessionId || (source === "FIXTURE" ? SESSION.id : "UNAVAILABLE")],
               ["AGENT", ev.agentId || (source === "FIXTURE" ? SESSION.agentId : "UNAVAILABLE")],
-              ["CONTRACT", source === "FIXTURE" ? SESSION.contractId : "NOT RECORDED"],
+              ["CONTRACT", ev.contractId || (source === "FIXTURE" ? SESSION.contractId : "NOT RECORDED")],
               ["TOOL", ev.tool],
               ["RESOURCE", ev.resource],
               ["CONTEXT", <TrustChip t={ev.trust} />],
@@ -138,7 +150,7 @@ export default function Evidence({ events, selected, select, go, source, chain }
         </Panel>
 
         <div>
-          <ChainLink ev={ev} events={events} />
+          <ChainLink ev={ev} events={safeEvents} />
         </div>
       </div>
     </>

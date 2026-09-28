@@ -6,7 +6,7 @@ import { RAILED_ROUTES, TRANSPORT_ROUTES } from "./routes.ts";
 import RailEvidence from "../evidence/RailEvidence.tsx";
 
 export default function AppShell({
-  route, setRoute, events, playIdx, setPlayIdx, selectedEvent, selectEvent, children
+  route, setRoute, events, playIdx, setPlayIdx, selectedEvent, selectEvent, activeRun, children
 }: any) {
   const hasRail = RAILED_ROUTES.has(route);
   const hasTransport = TRANSPORT_ROUTES.has(route);
@@ -16,7 +16,7 @@ export default function AppShell({
       <Sidebar route={route} setRoute={setRoute} />
 
       <main className="main">
-        <TopNav />
+        <TopNav activeRun={activeRun} />
         
         <div className={"workspace" + (hasRail ? " railed" : "")}>
           <div className="content">

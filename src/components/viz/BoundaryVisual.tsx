@@ -714,7 +714,7 @@ export default function BoundaryVisual({ height = 440, event = null, replayIndex
               selectStage(stage.id);
             }}>
             <strong>{stage.label}</strong>
-            <span>{stage.id === "request" ? event?.resource || stage.sub : stage.sub}</span>
+            <span>{stage.id === "request" ? event?.resource || stage.sub : stage.id === "contract" ? event?.contractId || stage.sub : stage.sub}</span>
           </button>
         ))}
       </div>
